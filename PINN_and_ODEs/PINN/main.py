@@ -35,33 +35,30 @@ def save_model(model, path):
 
 def solve_ode_numerically(ode_func, initial_conditions, x_start_ic, x_end, x_eval_points):
     """
-    Solves a 2nd order ODE using SciPy's solve_ivp, handling integration direction.
+    Solves a 2nd order ODE using SciPy's solve_ivp, with the initial conditions
+    imposed at x_start_ic. When x_start_ic lies inside the evaluation interval we
+    integrate forward AND backward from it: the dense output of a single forward
+    solve is only valid on [x_start_ic, x_end] and silently extrapolates outside.
     """
     from scipy.integrate import solve_ivp
-    
-    # solve_ivp requires t_eval to be sorted.
-    t_span = [x_start_ic, x_end]
-    
-    # If integrating backward, reverse the span for the solver
-    if x_start_ic > x_end:
-        t_span_for_solver = [x_end, x_start_ic]
-    else:
-        t_span_for_solver = [x_start_ic, x_end]
 
-    sol = solve_ivp(
-        fun=ode_func,
-        t_span=t_span_for_solver,
-        y0=initial_conditions,
-        t_eval=sorted(x_eval_points),
-        dense_output=True,
-        method='RK45'
-    )
-    
-    # The output of the solver is always sorted by time.
-    # We need to re-order it to match the original x_eval_points if they were in descending order.
-    # This is a simplified approach; a more robust solution might involve interpolation.
-    y_solution = sol.sol(x_eval_points)
-    return y_solution[0]
+    x_eval_points = np.asarray(x_eval_points, dtype=float)
+    y_solution = np.full_like(x_eval_points, np.nan)
+    x_lo, x_hi = min(x_eval_points.min(), x_start_ic), max(x_eval_points.max(), x_end, x_start_ic)
+
+    for x_target, mask in ((x_hi, x_eval_points >= x_start_ic), (x_lo, x_eval_points < x_start_ic)):
+        if not mask.any() or x_target == x_start_ic:
+            continue
+        sol = solve_ivp(ode_func, [x_start_ic, x_target], initial_conditions,
+                        method='RK45', rtol=1e-8, atol=1e-10, dense_output=True)
+        if not sol.success:
+            print(f"Warning: solve_ivp failed from x={x_start_ic} towards x={x_target}: {sol.message}")
+            continue
+        y_solution[mask] = sol.sol(x_eval_points[mask])[0]
+
+    # the IC point itself (if it is an evaluation point and no integration was needed)
+    y_solution[np.isclose(x_eval_points, x_start_ic) & np.isnan(y_solution)] = initial_conditions[0]
+    return y_solution
 
 # --- Placeholder Classes from SIMPLE_ode_support ---
 
