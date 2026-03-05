@@ -175,9 +175,10 @@ class NoDataLoss(nn.Module):
     r"""
     Custom loss function for training without pre-generated data (PINN).
     Calculates the loss based on the ODE's residual and boundary conditions.
-    Loss C(p) = \int_0^1 [ \Phi[F_p(t)] ]^2 dt + \alpha [ F_p(c) - g_0 ]^2 + \beta [ F_p'(c) - g_1 ]^2
+    Loss C(p) = 1/(b-a) \int_a^b [ \Phi[F_p(t)] ]^2 dt + \alpha [ F_p(c) - g_0 ]^2 + \beta [ F_p'(c) - g_1 ]^2
+    where [a, b] is the evaluation interval of the problem.
     """
-    def __init__(self, ode_func, alpha, beta, g0, g1, device):
+    def __init__(self, ode_func, alpha, beta, g0, g1, device, t_min=0.0, t_max=1.0, n_collocation=201):
         super().__init__()
         self.ode_func = ode_func  # The function defining the ODE dynamics
         self.alpha = alpha
@@ -185,13 +186,19 @@ class NoDataLoss(nn.Module):
         self.g0 = g0  # Boundary condition value y(c)
         self.g1 = g1  # Boundary condition value y'(c)
         self.device = device
+        self.t_min = t_min
+        self.t_max = t_max
+        self.n_collocation = n_collocation
 
     def forward(self, model, p):
         # p is the parameter 'c' which is also the point for the boundary conditions
         p.requires_grad_(True)
 
         # 1. Physics Residual Loss (Integral Term)
-        collocation_points_t = torch.linspace(0, 1, 101, device=self.device).reshape(-1, 1)
+        # NB: the residual must be enforced on the whole interval where we evaluate the
+        # solution. It used to be [0, 1] regardless of X_EVAL_START/END, so on e.g. [0, 10]
+        # the network only ever saw the physics on the first tenth of the domain.
+        collocation_points_t = torch.linspace(self.t_min, self.t_max, self.n_collocation, device=self.device).reshape(-1, 1)
         collocation_points_t.requires_grad_(True)
         
         param_tensor_for_model = p.expand_as(collocation_points_t)
@@ -248,8 +255,9 @@ def train_with_no_data():
     pinn_model = PINN_MLP().to(device)
     optimizer = torch.optim.Adam(pinn_model.parameters(), lr=lr)
     
-    loss_fn = NoDataLoss(ode_func=ode_function, alpha=1, beta=1, 
-                         g0=GLOBAL_Y0_FIXED_AT_C, g1=GLOBAL_Y_PRIME0_FIXED_AT_C, device=device)
+    loss_fn = NoDataLoss(ode_func=ode_function, alpha=alpha, beta=beta,
+                         g0=GLOBAL_Y0_FIXED_AT_C, g1=GLOBAL_Y_PRIME0_FIXED_AT_C, device=device,
+                         t_min=X_EVAL_START_LOADED, t_max=X_EVAL_END_LOADED)
 
     print("Starting PINN training...")
     param_range = torch.linspace(PARAM_MIN_LOADED, PARAM_MAX_LOADED, num_params_to_train, device=device)
