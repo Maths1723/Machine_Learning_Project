@@ -2,7 +2,12 @@
 
 # 1. Add 'import torch' at the top of the file
 import torch
-import numpy as np 
+import numpy as np
+
+
+def _sin(v):
+    # works on floats/arrays (SciPy reference solution) and on tensors (PINN residual)
+    return torch.sin(v) if torch.is_tensor(v) else np.sin(v)
 
 # These are the parameters for the pendulum ODE
 # y'' + beta*y' + alpha*sin(y) = 0
@@ -37,7 +42,7 @@ def ode_system(t, y, param_val_c):
     # This was the problematic line:
     # d2y_dt2 = -FIXED_BETA * y[1] - FIXED_ALPHA * np.sin(y[0])
     
-    # 2. This is the corrected line using torch.sin
-    d2y_dt2 = -FIXED_BETA * y[1] - FIXED_ALPHA * torch.sin(y[0])
+    # torch.sin alone broke the SciPy reference solve, np.sin broke the PINN: dispatch on type
+    d2y_dt2 = -FIXED_BETA * y[1] - FIXED_ALPHA * _sin(y[0])
     
     return [dy_dt, d2y_dt2]

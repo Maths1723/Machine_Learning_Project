@@ -1,4 +1,10 @@
 import numpy as np
+import torch
+
+
+def _sin(v):
+    # works on floats/arrays (SciPy data generation) and on tensors (PINN residual)
+    return torch.sin(v) if torch.is_tensor(v) else np.sin(v)
 
 # Non-linear pendulum with damping (attrition), no forcing:
 # y'' + beta * y' + alpha * sin(y) = 0
@@ -30,6 +36,6 @@ def ode_system(t, y, param_val_c):
     
     dy_dt = y[1]
     # d2y_dt2 = -beta * y' - alpha * sin(y)
-    d2y_dt2 = -FIXED_BETA * y[1] - FIXED_ALPHA * np.sin(y[0])
+    d2y_dt2 = -FIXED_BETA * y[1] - FIXED_ALPHA * _sin(y[0])
     
     return [dy_dt, d2y_dt2]
