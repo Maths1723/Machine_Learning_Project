@@ -22,10 +22,44 @@ def get_device():
 def get_user_choice(prompt, valid_choices):
     """Prompts the user for input and validates it against a list of choices."""
     while True:
-        choice = input(prompt).lower()
+        choice = input(prompt).strip().lower()
         if choice in valid_choices:
             return choice
         print(f"Invalid choice. Please select from {valid_choices}.")
+
+def clean_path(raw):
+    """Strip whitespace and the quotes Windows adds with 'Copy as path'."""
+    return raw.strip().strip('"').strip("'")
+
+def find_ode_configs(folder):
+    """Python files in `folder` that look like ODE configs (define ode_system + PARAM_NAME_IN_MAT_FILE)."""
+    configs = []
+    for name in sorted(os.listdir(folder)):
+        if not name.endswith('.py') or name in ('main.py', 'SIMPLE_ode_support.py'):
+            continue
+        with open(os.path.join(folder, name), encoding='utf-8', errors='ignore') as fh:
+            src = fh.read()
+        if 'def ode_system' in src and 'PARAM_NAME_IN_MAT_FILE' in src:
+            configs.append(os.path.join(folder, name))
+    return configs
+
+def select_ode_config():
+    """Numbered menu of the ODE configs next to this script; a custom path can still be typed."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    configs = find_ode_configs(here)
+    print("\nAvailable ODE configurations:")
+    for i, path in enumerate(configs, 1):
+        print(f"  [{i}] {os.path.basename(path)}")
+    print("  [q] quit")
+    while True:
+        raw = clean_path(input("Select a configuration by number, or type a path to another config file: "))
+        if raw.lower() == 'q':
+            return None
+        if raw.isdigit() and 1 <= int(raw) <= len(configs):
+            return configs[int(raw) - 1]
+        if raw and os.path.isfile(raw):
+            return raw
+        print(f"'{raw}' is neither a number in 1..{len(configs)} nor an existing file.")
 
 def save_model(model, path):
     """Saves the model's state dictionary."""
@@ -291,7 +325,7 @@ def pinn_post_train_menu(model, loss_fn, trained_param_range):
     while True:
         print("\n--- PINN Model Actions ---")
         choice = get_user_choice(
-            "What do you want to do? (s)plot single solution, (f)lot flux, (e)rror norm, (b)ack to main menu, (q)uit? [s/f/e/b/q]: ",
+            "What do you want to do? plot a (s)ingle solution, plot the (f)lux, (e)rror norm, (b)ack to main menu, (q)uit? [s/f/e/b/q]: ",
             ['s', 'f', 'e', 'b', 'q']
         )
 
@@ -571,7 +605,7 @@ def denoiser_post_train_menu(model, denoising_criterion, denoiser_optimizer,
     """Presents a menu for actions after denoiser training."""
     while True:
         print("\n--- Noisy-Data Trained Model Actions ---")
-        choice = get_user_choice("What do you want to do? (f)lot flux, (e)rror norm plot, (r)etrain for N epochs, (b)ack to main menu, (q)uit program? [f/e/r/b/q]: ", ['f', 'e', 'r', 'b', 'q'])
+        choice = get_user_choice("What do you want to do? plot the (f)lux, (e)rror norm plot, (r)etrain for N epochs, (b)ack to main menu, (q)uit program? [f/e/r/b/q]: ", ['f', 'e', 'r', 'b', 'q'])
 
         if choice == 'f':
             num_flux_lines_str = input("Enter the number of solutions to plot for the flux (e.g., 5 or 10): ")
@@ -615,7 +649,7 @@ def denoise_data():
     noisy_mat_path_actual = None
     
     if generate_noisy_choice == 'g':
-        temp_original_data_file = input("Enter the path to the original (clean) .mat data file to generate noisy data from: ")
+        temp_original_data_file = clean_path(input("Enter the path to the original (clean) .mat data file to generate noisy data from: "))
         if not os.path.exists(temp_original_data_file):
             print(f"Error: Clean data file '{temp_original_data_file}' not found. Returning.")
             return 'back_to_main'
@@ -630,7 +664,7 @@ def denoise_data():
             print("Failed to generate noisy data, cannot proceed with training.")
             return 'back_to_main'
     else: # 'l' for load
-        noisy_mat_path_actual = input("Enter the path to the noisy .mat data file: ")
+        noisy_mat_path_actual = clean_path(input("Enter the path to the noisy .mat data file: "))
         if not os.path.exists(noisy_mat_path_actual):
             print(f"Error: Noisy data file '{noisy_mat_path_actual}' not found. Returning.")
             return 'back_to_main'
@@ -687,7 +721,9 @@ while select_ode_func:
     X_EVAL_START_LOADED, X_EVAL_END_LOADED, NUM_X_EVAL_POINTS_LOADED = None, None, None
 
     # --- Dynamic ODE Function and Problem Parameters Loading ---
-    ode_func_file_path = input("Enter the path to the Python file defining the ODE function (e.g., 'ode_func_eq2.py'): ")
+    ode_func_file_path = select_ode_config()
+    if ode_func_file_path is None:
+        break
     try:
         spec = importlib.util.spec_from_file_location("ode_module", ode_func_file_path)
         ode_module = importlib.util.module_from_spec(spec)
@@ -727,10 +763,10 @@ while select_ode_func:
                 select_ode_func = False
 
         elif action_choice == 'g':
-            generate_data_choice = input("Do you have a pre-generated data file (y/n)? ").lower()
+            generate_data_choice = get_user_choice("Do you have a pre-generated data file (y/n)? ", ['y', 'n'])
 
             if generate_data_choice == 'y':
-                mat_data_path = input("Enter the path to the .mat data file: ")
+                mat_data_path = clean_path(input("Enter the path to the .mat data file: "))
                 if not os.path.exists(mat_data_path):
                     print(f"Error: Data file '{mat_data_path}' not found. Returning.")
                     continue 
@@ -896,7 +932,7 @@ while select_ode_func:
                     print("Data generation failed, cannot add noise. Returning.")
                     continue
             else: # 'l'
-                original_data_file_for_noise = input("Enter the path to the original (clean) .mat data file: ")
+                original_data_file_for_noise = clean_path(input("Enter the path to the original (clean) .mat data file: "))
                 if not os.path.exists(original_data_file_for_noise):
                     print(f"Error: Data file '{original_data_file_for_noise}' not found. Returning.")
                     continue
