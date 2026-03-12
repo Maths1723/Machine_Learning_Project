@@ -64,6 +64,7 @@ def save_model_CNN(model, path = "tomato_CNN.pth"):
 
 # - - - Training - - -
 def train( data_loader, model, criterion, optimizer, device ):
+    model.train() # test() leaves the model in eval mode (dropout off)
     # Number of batches :
     num_batches = len( data_loader )
     # Total number of samples :
@@ -76,7 +77,7 @@ def train( data_loader, model, criterion, optimizer, device ):
         # Forward pass :
         output = model( data )
         loss = criterion( output, target )
-        total_loss += loss
+        total_loss += loss.item() # .item(): do not keep every batch graph alive
         # Backpropagation :
         loss.backward()
         # Update the weights :

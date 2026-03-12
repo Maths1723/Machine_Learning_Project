@@ -42,7 +42,7 @@ num_classes = len(train_dataset.classes)
 print(f"Number of classes in the dataset: {num_classes}")
 
 train_loader = DataLoader( dataset = train_dataset, batch_size = batch_size, shuffle = True )
-test_loader = DataLoader( dataset = test_dataset, batch_size = batch_size, shuffle = True )
+test_loader = DataLoader( dataset = test_dataset, batch_size = batch_size, shuffle = False )
 
 # - - - Model Creation & Training/Loading - - -
 model = MLP(num_classes=num_classes).to(device)
