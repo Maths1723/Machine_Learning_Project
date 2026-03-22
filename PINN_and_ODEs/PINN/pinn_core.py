@@ -103,6 +103,66 @@ class ParametricPINN(nn.Module):
         return self.net(x)
 
 
+class ShiftPINN(nn.Module):
+    """u(t, c) = N(t - c): hard-codes time-translation symmetry.
+
+    If f does not depend on t (autonomous ODE) and the parameter is the IC
+    point c, then y(t; c) = Y(t - c) where Y solves the IVP with ICs at 0.
+    The whole family is ONE trajectory, shifted, so the network only has to
+    learn a function of one variable s = t - c on [t_min - c_max, t_max - c_min].
+    """
+
+    def __init__(self, problem, hidden=64, layers=4):
+        super().__init__()
+        if not problem.ic_at_param:
+            raise ValueError("ShiftPINN needs the parameter to be the IC point (c_values configs)")
+        self.net = mlp(1, 1, hidden, layers)
+        s_lo, s_hi = problem.t_min - problem.p_max, problem.t_max - problem.p_min
+        self.register_buffer("s_mid", torch.tensor((s_hi + s_lo) / 2))
+        self.register_buffer("s_half", torch.tensor(max((s_hi - s_lo) / 2, 1e-12)))
+
+    def forward(self, t, p):
+        return self.net((t - p - self.s_mid) / self.s_half)
+
+
+class HardIC(nn.Module):
+    """Wraps a model so that the initial conditions hold exactly:
+
+        u(t, p) = g0 + g1 (t - t0) + ((t - t0) / T)^2 N(t, p),   t0 = t0(p).
+
+    u(t0) = g0 and u'(t0) = g1 for any N, so the IC penalties (and the alpha,
+    beta weights) disappear. In particular u = 0 is no longer admissible
+    when g0 != 0, which removes the trivial-solution trap of Van der Pol.
+    """
+
+    hard_ic = True
+
+    def __init__(self, base, problem):
+        super().__init__()
+        self.base = base
+        self.problem = problem
+        self.T = problem.t_max - problem.t_min
+
+    def forward(self, t, p):
+        s = t - self.problem.ic_point(p)
+        return self.problem.g0 + self.problem.g1 * s + (s / self.T) ** 2 * self.base(t, p)
+
+
+def make_model(kind, problem, hidden=64, layers=4):
+    """'legacy' | 'soft' | 'hard' | 'shift' | 'shift-hard'."""
+    if kind == "legacy":
+        return ParametricPINN(problem, hidden, layers, normalize=False)
+    if kind == "soft":
+        return ParametricPINN(problem, hidden, layers)
+    if kind == "hard":
+        return HardIC(ParametricPINN(problem, hidden, layers), problem)
+    if kind == "shift":
+        return ShiftPINN(problem, hidden, layers)
+    if kind == "shift-hard":
+        return HardIC(ShiftPINN(problem, hidden, layers), problem)
+    raise ValueError(f"unknown model kind '{kind}'")
+
+
 # --------------------------------------------------------------------------
 # Residual and losses
 # --------------------------------------------------------------------------
@@ -142,19 +202,57 @@ class TrainConfig:
     beta: float = 10.0        # weight of (u'(t0) - g1)^2
     resample: bool = True     # draw fresh random collocation points every step
     colloc_range: tuple = None  # override [t_min, t_max]; (0, 1) reproduces the old bug
+    causal_eps: float = 0.0   # > 0: two-sided causal weighting around t0 (see causal_pde_loss)
+    causal_bins: int = 32
+    curriculum: float = 0.0   # > 0: fraction of epochs over which the window around t0 grows to full
     seed: int = 0
     log_every: int = 500
 
 
-def sample_points(problem, cfg, step_rng, device):
+def window_radius(problem, cfg, epoch):
+    """Half-width of the admissible |t - t0| window at this epoch (curriculum)."""
+    full = problem.t_max - problem.t_min
+    if cfg.curriculum <= 0:
+        return full
+    frac = min(1.0, 0.05 + 0.95 * epoch / (cfg.curriculum * cfg.epochs))
+    return frac * full
+
+
+def sample_points(problem, cfg, step_rng, device, radius=None):
     t_lo, t_hi = cfg.colloc_range or (problem.t_min, problem.t_max)
     if cfg.resample:
         p = problem.p_min + (problem.p_max - problem.p_min) * torch.rand(cfg.n_p, 1, generator=step_rng)
-        t = t_lo + (t_hi - t_lo) * torch.rand(cfg.n_p, cfg.n_t, generator=step_rng)
+        u = torch.rand(cfg.n_p, cfg.n_t, generator=step_rng)
     else:
         p = torch.linspace(problem.p_min, problem.p_max, cfg.n_p).reshape(-1, 1)
-        t = torch.linspace(t_lo, t_hi, cfg.n_t).expand(cfg.n_p, cfg.n_t)
+        u = torch.linspace(0, 1, cfg.n_t).expand(cfg.n_p, cfg.n_t)
+    if radius is not None:
+        # restrict each row to [t0 - radius, t0 + radius] intersected with the domain
+        t0 = problem.ic_point(p)
+        t_lo = torch.clamp(t0 - radius, min=t_lo)
+        t_hi = torch.clamp(t0 + radius, max=t_hi)
+    t = t_lo + (t_hi - t_lo) * u
     return t.to(device), p.to(device)
+
+
+def causal_pde_loss(r2, dist, eps, n_bins):
+    """Two-sided causal weighting (after Wang, Sankaran & Perdikaris 2022).
+
+    The IC point t0 = c sits INSIDE the interval, so information propagates
+    both forward and backward from it. Points are binned by d = |t - t0|;
+    bin k gets weight exp(-eps * sum_{j<k} L_j) (no gradient through the
+    weights), so the far field is only fitted once the near field is.
+    Returns (loss, min weight).
+    """
+    d_max = dist.max().clamp_min(1e-12)
+    idx = torch.clamp((dist / d_max * n_bins).long(), max=n_bins - 1).ravel()
+    sums = torch.zeros(n_bins, device=r2.device).index_add(0, idx, r2.ravel())
+    counts = torch.zeros(n_bins, device=r2.device).index_add(0, idx, torch.ones_like(r2.ravel()))
+    L = sums / counts.clamp_min(1)
+    occupied = counts > 0
+    w = torch.exp(-eps * (torch.cumsum(L, 0) - L)).detach()
+    loss = torch.sum(w * L * occupied) / occupied.sum()
+    return loss, w[occupied].min().item()
 
 
 def compute_loss(model, problem, cfg, t, p):
@@ -163,7 +261,13 @@ def compute_loss(model, problem, cfg, t, p):
     t_flat = t.reshape(-1, 1).requires_grad_(True)
     p_flat = p.expand(n_p, n_t).reshape(-1, 1)
     r = ode_residual(model, problem, t_flat, p_flat)
-    loss_pde = torch.mean(r ** 2)
+    if cfg.causal_eps > 0:
+        dist = (t_flat - problem.ic_point(p_flat)).abs().detach()
+        loss_pde, w_min = causal_pde_loss(r ** 2, dist, cfg.causal_eps, cfg.causal_bins)
+    else:
+        loss_pde = torch.mean(r ** 2)
+    if getattr(model, "hard_ic", False):
+        return loss_pde, {"pde": loss_pde.item(), "ic0": 0.0, "ic1": 0.0}
     l0, l1 = ic_loss(model, problem, p)
     loss = loss_pde + cfg.alpha * l0 + cfg.beta * l1
     return loss, {"pde": loss_pde.item(), "ic0": l0.item(), "ic1": l1.item()}
@@ -178,7 +282,8 @@ def train_pinn(model, problem, cfg, device="cpu", verbose=True):
     history = []
     t_start = time.time()
     for epoch in range(1, cfg.epochs + 1):
-        t, p = sample_points(problem, cfg, rng, device)
+        radius = window_radius(problem, cfg, epoch) if cfg.curriculum > 0 else None
+        t, p = sample_points(problem, cfg, rng, device, radius)
         loss, parts = compute_loss(model, problem, cfg, t, p)
         opt.zero_grad()
         loss.backward()
