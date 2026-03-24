@@ -49,3 +49,34 @@ Two different failures:
 Hypothesis: the stuck PINN is a *trivial-solution trap*, not a capacity issue.
 Next: make the ICs exact (hard constraint) so u ≡ 0 is no longer admissible,
 and make training respect causality away from t = c.
+
+## 2026-03-24 · Observation: the c-family is one trajectory
+
+All our configs (pendulum, Van der Pol, Rayleigh) are **autonomous**:
+f = f(y, y') does not depend on t. If Y solves Y'' = f(Y, Y'), Y(0) = g0,
+Y'(0) = g1, then y(t; c) := Y(t - c) satisfies the same ODE and
+y(c) = g0, y'(c) = g1. By uniqueness (f is C^1, so locally Lipschitz)
+
+    y(t; c) = Y(t - c)   for all t, c.
+
+Consequences:
+
+* The "parameter-to-solution map" c -> y(.; c) learned in the report is just a
+  translation operator applied to a single function Y on
+  s in [t_min - c_max, t_max - c_min] (= [-2, 10] for VdP).
+* This explains why the hybrid model generalised so well with "even minimal
+  data augmentation": shifting one trajectory generates the whole dataset.
+  It also means that the c-family is a weak test of *parametric* learning:
+  the intrinsic dimension of the solution manifold is 1.
+* For a PINN we can hard-code it: u(t, c) = N(t - c) (`ShiftPINN`). The
+  residual of the shifted net is then the residual of a single-IVP PINN on
+  the s-interval, evaluated at points sampled from every c at once.
+
+Two follow-ups:
+1. A genuinely parametric benchmark needs the parameter inside f (e.g. the
+   VdP mu, the pendulum damping). Add such configs.
+2. With the symmetry built in, any remaining failure is a property of the
+   single IVP, not of the parametrisation: a cleaner experiment.
+
+Also added `HardIC`: u = g0 + g1 (t - c) + ((t - c)/T)^2 N(t, c), which
+satisfies both ICs exactly for any N (no alpha/beta to tune).
