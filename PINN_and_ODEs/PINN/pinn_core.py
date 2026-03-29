@@ -205,6 +205,7 @@ class TrainConfig:
     causal_eps: float = 0.0   # > 0: two-sided causal weighting around t0 (see causal_pde_loss)
     causal_bins: int = 32
     curriculum: float = 0.0   # > 0: fraction of epochs over which the window around t0 grows to full
+    lbfgs_steps: int = 0      # L-BFGS refinement on a fixed dense grid after Adam
     seed: int = 0
     log_every: int = 500
 
@@ -295,6 +296,39 @@ def train_pinn(model, problem, cfg, device="cpu", verbose=True):
             if verbose:
                 print(f"  epoch {epoch:6d}  loss {loss.item():.3e}  pde {parts['pde']:.3e}  "
                       f"ic {parts['ic0']:.1e}/{parts['ic1']:.1e}")
+    if cfg.lbfgs_steps > 0:
+        history += refine_lbfgs(model, problem, cfg, device, verbose)
+    return history
+
+
+def refine_lbfgs(model, problem, cfg, device="cpu", verbose=True):
+    """Full-batch L-BFGS on a fixed dense grid (no causal weights, full window).
+
+    Adam gets the network into the right basin; L-BFGS then removes most of
+    the remaining residual, which for oscillators is mostly phase error.
+    """
+    grid_cfg = TrainConfig(n_p=max(cfg.n_p, 16), n_t=max(cfg.n_t, 256), resample=False,
+                           alpha=cfg.alpha, beta=cfg.beta)
+    t, p = sample_points(problem, grid_cfg, None, device)
+    opt = torch.optim.LBFGS(model.parameters(), lr=1.0, max_iter=20, history_size=50,
+                            line_search_fn="strong_wolfe")
+    history = []
+    n_outer = max(cfg.lbfgs_steps // 20, 1)
+    for k in range(1, n_outer + 1):
+        def closure():
+            opt.zero_grad()
+            loss, _ = compute_loss(model, problem, grid_cfg, t, p)
+            loss.backward()
+            return loss
+        opt.step(closure)
+        loss, parts = compute_loss(model, problem, grid_cfg, t, p)
+        if not torch.isfinite(loss):
+            break
+        if k % max(n_outer // 4, 1) == 0 or k == n_outer:
+            parts.update(epoch=cfg.epochs + 20 * k, loss=loss.item(), seconds=None)
+            history.append(parts)
+            if verbose:
+                print(f"  lbfgs {20 * k:5d}  loss {loss.item():.3e}  pde {parts['pde']:.3e}")
     return history
 
 
