@@ -80,3 +80,52 @@ Two follow-ups:
 
 Also added `HardIC`: u = g0 + g1 (t - c) + ((t - c)/T)^2 N(t, c), which
 satisfies both ICs exactly for any N (no alpha/beta to tune).
+
+## 2026-04-14 · Benchmark: what actually fixes the PINN
+
+`experiments/run_benchmark.py`, 4x64 tanh, 6000 Adam steps (cosine LR from
+1e-3) + 1000 L-BFGS iterations, 3 seeds, 21 test parameters, relative L2
+error against DOP853. Raw data in `results/benchmark.csv`, per-parameter
+curves in `results/curves/`, table in `results/summary.md`, figure
+`results/error_vs_param.png`. Median over seeds (worst seed's max in brackets):
+
+**c-families (parameter = IC point)**
+
+| | legacy | soft ICs | hard ICs | shift + hard ICs |
+|---|---|---|---|---|
+| VdP, + curriculum | – | 1.00 (1.01) | 1.6e-2 (0.62) | **3.5e-3** (5.6e-3) |
+| VdP, no curriculum | 1.18 (1.36) | 1.00 (1.00) | 0.21 (0.91) | **1.4e-3** (1.4e-2) |
+| pendulum, + curriculum | 2.58 (3.88) | 2.5e-2 (0.11) | – | **5.3e-4** (1.0e-3) |
+| Rayleigh, + curriculum | 1.49 (1.55) | 7.2e-4 (5.5e-3) | – | **8.7e-5** (2.5e-4) |
+
+**Genuinely parametric families (parameter inside f, ICs at t = 0)**
+
+| | soft ICs | hard ICs |
+|---|---|---|
+| VdP, mu in [0.5, 2] | **4.9e-3** (2.5e-2) | 1.1e-2 (3.3e-2) |
+| pendulum, damping in [0.05, 0.6] | 5.9e-2 (0.33) | **3.5e-3** (1.4e-2) |
+
+Reading:
+
+1. **The original PINN fails everywhere** (rel. error > 1), on all three ODEs.
+   This is mostly the [0, 1] collocation bug, not an intrinsic PINN weakness.
+2. **Van der Pol with soft ICs is stuck at u ≈ 0 for every seed and every
+   training variant** (error 1.00, 6/6 runs), confirming the trivial-solution
+   trap. Pendulum and Rayleigh do not have it (larger IC amplitude / no
+   repelling equilibrium near the IC), and soft ICs already work there.
+3. **Hard ICs alone are not enough**: they escape the trap but are
+   seed-dependent (VdP: 4e-3 to 0.29 with curriculum, worse without).
+4. **Shift structure + hard ICs works on every run**: 12/12 runs below
+   1.4e-2, typically 1e-4 – 1e-3: 8x (Rayleigh) to 50x (pendulum) better than
+   soft ICs, and the only variant that reliably solves VdP. With the
+   symmetry built in the curriculum is no longer needed.
+5. Shift-hard error curves are flat in c (see figure), as they must be: every
+   c sees the same learned function, so the error is that of a single IVP.
+6. On the parametric families hard ICs help a lot for the damped pendulum
+   (17x) but are slightly worse for VdP-mu. Not yet understood; candidate
+   explanation: the ((t - t0)/T)^2 factor makes the network output large late
+   in the interval where VdP-mu has sharp relaxation fronts for mu = 2.
+
+Caveats before claiming anything: one architecture, one budget, 3 seeds,
+CPU float32. Needs: wall-clock-matched comparison, a data-driven (hybrid)
+baseline from the report on the same error metric, and larger mu (stiff VdP).
