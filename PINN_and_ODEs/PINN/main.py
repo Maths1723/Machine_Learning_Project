@@ -270,6 +270,12 @@ def train_with_no_data():
     """
     print("\n--- Physics-Informed Training (No Data) ---")
 
+    method = get_user_choice(
+        "Method: (o)riginal PINN (soft ICs, Adam) or (i)mproved PINN (hard ICs, shift structure when "
+        "applicable, curriculum + L-BFGS; see notes/research_log.md)? [o/i]: ", ['o', 'i'])
+    if method == 'i':
+        return train_improved_pinn()
+
     if input_param_name_in_mat != 'c_values':
         print(f"Warning: No-data training is designed for problems where the parameter defines the IC point (e.g., 'c_values').")
         print(f"Current parameter is '{input_param_name_in_mat}'. The results might not be meaningful.")
@@ -320,14 +326,63 @@ def train_with_no_data():
     return pinn_post_train_menu(pinn_model, loss_fn, param_range)
 
 
+def train_improved_pinn():
+    """PINN from pinn_core: hard ICs (+ shift structure for autonomous c-families),
+    growing collocation window around the IC point, then L-BFGS refinement."""
+    from pinn_core import TrainConfig, load_problem, make_model, train_pinn
+
+    problem = load_problem(ode_func_file_path)
+    kind = 'shift-hard' if problem.ic_at_param else 'hard'
+    try:
+        epochs = int(input("Adam epochs (e.g., 6000): ") or 6000)
+        lbfgs_steps = int(input("L-BFGS iterations after Adam (e.g., 1000, 0 to skip): ") or 1000)
+        if epochs <= 0 or lbfgs_steps < 0:
+            raise ValueError
+    except ValueError:
+        print("Invalid input. Please enter non-negative integers.")
+        return 'back_to_main'
+
+    print(f"Training '{kind}' PINN on {problem.name} ...")
+    model = make_model(kind, problem).to(device)
+    cfg = TrainConfig(epochs=epochs, lbfgs_steps=lbfgs_steps, curriculum=0.6, log_every=max(epochs // 10, 1))
+    train_pinn(model, problem, cfg, device=device)
+    save_model(model, f"pinn_{kind}_{problem.name}.pth")
+
+    loss_fn = NoDataLoss(ode_func=ode_function, alpha=1.0, beta=1.0,
+                         g0=GLOBAL_Y0_FIXED_AT_C, g1=GLOBAL_Y_PRIME0_FIXED_AT_C, device=device,
+                         t_min=X_EVAL_START_LOADED, t_max=X_EVAL_END_LOADED)
+    param_range = torch.linspace(PARAM_MIN_LOADED, PARAM_MAX_LOADED, 21, device=device)
+    return pinn_post_train_menu(model, loss_fn, param_range)
+
+
+def plot_pinn_true_error(model):
+    """Relative L2 error of the PINN against the SciPy (DOP853) reference, per parameter value."""
+    from pinn_core import evaluate, load_problem
+
+    p_vals, errors = evaluate(model, load_problem(ode_func_file_path), n_p=41, device=device)
+    print(f"Relative L2 error: median {np.median(errors):.3e}, max {errors.max():.3e}")
+    plt.figure(figsize=(10, 6))
+    plt.semilogy(p_vals, errors, marker='o')
+    plt.title('PINN relative L2 error vs. SciPy reference')
+    plt.xlabel(f"Parameter '{input_param_name_in_mat.replace('_values', '')}'")
+    plt.ylabel('||u - y|| / ||y||')
+    plt.grid(True, which='both')
+    plt.show()
+
+
 def pinn_post_train_menu(model, loss_fn, trained_param_range):
     """Presents a menu for actions after PINN training."""
     while True:
         print("\n--- PINN Model Actions ---")
         choice = get_user_choice(
-            "What do you want to do? plot a (s)ingle solution, plot the (f)lux, (e)rror norm, (b)ack to main menu, (q)uit? [s/f/e/b/q]: ",
-            ['s', 'f', 'e', 'b', 'q']
+            "What do you want to do? plot a (s)ingle solution, plot the (f)lux, (e)rror norm (loss), "
+            "(t)rue error vs SciPy, (b)ack to main menu, (q)uit? [s/f/e/t/b/q]: ",
+            ['s', 'f', 'e', 't', 'b', 'q']
         )
+
+        if choice == 't':
+            plot_pinn_true_error(model)
+            continue
 
         if choice == 's':
             try:
@@ -370,12 +425,13 @@ def plot_pinn_single_solution(model, c_val):
 
     ode_func_scipy = lambda t, y: ode_function(t, y, c_val)
     ic = [GLOBAL_Y0_FIXED_AT_C, GLOBAL_Y_PRIME0_FIXED_AT_C]
-    numerical_solution = solve_ode_numerically(ode_func_scipy, ic, c_val, t_eval[-1], t_eval)
+    ic_point = c_val if FIXED_IC_POINT is None else FIXED_IC_POINT  # parametric configs: ICs at a fixed x
+    numerical_solution = solve_ode_numerically(ode_func_scipy, ic, ic_point, t_eval[-1], t_eval)
 
     plt.figure(figsize=(12, 7))
-    plt.plot(t_eval, predicted_solution, label=f'PINN Predicted Solution (c={c_val:.2f})', color='red', linestyle='-')
-    plt.plot(t_eval, numerical_solution, label=f'SciPy Numerical Solution (c={c_val:.2f})', color='blue', linestyle='--')
-    plt.axvline(x=c_val, color='purple', linestyle=':', label=f'IC at x=c={c_val:.2f}')
+    plt.plot(t_eval, predicted_solution, label=f'PINN Predicted Solution (p={c_val:.2f})', color='red', linestyle='-')
+    plt.plot(t_eval, numerical_solution, label=f'SciPy Numerical Solution (p={c_val:.2f})', color='blue', linestyle='--')
+    plt.axvline(x=ic_point, color='purple', linestyle=':', label=f'IC at x={ic_point:.2f}')
     plt.title("PINN vs. Numerical Solution")
     plt.xlabel("x (or t)")
     plt.ylabel("y(x)")
