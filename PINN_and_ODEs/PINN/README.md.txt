@@ -1,3 +1,38 @@
+# PINN follow-up (2026)
+
+This folder now also contains a scriptable PINN library and a benchmark, written
+after the Exercise 7 report to understand why the original PINN failed.
+Short version (details and numbers in `notes/research_log.md`):
+
+* The original PINN imposed the ODE only on t in [0, 1] (bug, fixed in
+  `main.py`), ignored the alpha/beta weights, and was compared against a SciPy
+  reference that was wrong for t < c. With those fixed, the PINN still gets
+  stuck on Van der Pol: u = 0 is an exact solution, and with soft initial
+  conditions it is a deep local minimum (*trivial-solution trap*).
+* All configs are autonomous, so y(t; c) = Y(t - c): the whole c-family is one
+  shifted trajectory. Building this into the network, u(t, c) = N(t - c), together
+  with exactly enforced initial conditions, solves every c-family on every seed
+  (relative L2 error 1e-4 to 1e-3 on pendulum and Rayleigh, <= 1.4e-2 on Van der Pol).
+
+| file | what |
+|---|---|
+| `main.py` | interactive tool; `(p)` -> `(i)mproved` uses the new PINN, `(t)` plots the true error |
+| `pinn_core.py` | models (`soft`, `hard`, `shift`, `shift-hard`), residual, causal/curriculum training, L-BFGS, evaluation |
+| `numerics.py` | DOP853 reference solution (forward and backward from the IC point) |
+| `parametric_*.py` | families where the parameter enters the ODE (VdP mu, pendulum damping) |
+| `experiments/run_benchmark.py` | reproducible benchmark -> `results/benchmark.csv` |
+| `experiments/summarize.py` | table + figure from the CSV |
+| `tests/` | `pytest tests` |
+
+```bash
+pip install -r requirements.txt
+pytest tests
+python experiments/run_benchmark.py --configs data_augmentation_van_der_pol.py     --models soft,shift-hard --epochs 6000 --lbfgs 1000 --curriculum 0.6 --seeds 0,1,2
+python experiments/summarize.py results/benchmark.csv --plot results/error_vs_param.png
+```
+
+---
+
 Markdown
 
 # Neural Network Based Ordinary Differential Equation Solver
