@@ -62,6 +62,16 @@ Our results highlight the varying degrees of accuracy achieved by both architect
 * **SciPy:** For numerical solvers used in data generation for ODEs.
 * **C/C++:** (Majorly for testing purposes within the broader course context, though not directly applied in these specific Python scripts).
 
+## 2026 follow-up: PINNs
+
+The PINN part of Exercise 1 was revisited in spring 2026: several bugs in the
+original PINN were fixed (residual only enforced on [0, 1], ignored loss
+weights, wrong SciPy reference for t < c), and a new PINN with exact initial
+conditions and built-in time-translation symmetry was benchmarked. It solves
+all three oscillator families reliably, including Van der Pol where the
+original approach got stuck on the trivial solution. See
+`PINN_and_ODEs/PINN/README.md.txt` and `PINN_and_ODEs/PINN/notes/research_log.md`.
+
 ## Authors
 
 * **Leonardo Fusar Bassini** - [Link to Leonardo's LinkedIn profile]
