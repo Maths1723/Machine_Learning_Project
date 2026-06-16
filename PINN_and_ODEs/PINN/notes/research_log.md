@@ -129,3 +129,36 @@ Reading:
 Caveats before claiming anything: one architecture, one budget, 3 seeds,
 CPU float32. Needs: wall-clock-matched comparison, a data-driven (hybrid)
 baseline from the report on the same error metric, and larger mu (stiff VdP).
+
+## 2026-06-16 · Data-driven baseline on the same metric
+
+`surrogate.py` = the report's hybrid model (ReLU 3x128, p -> solution on a
+400-point grid), trained 5000 Adam steps on N DOP853 solutions at equispaced
+parameters; tested on the same 21 parameters and rel. L2 as the PINNs (test
+parameters mostly fall *between* training ones). `results/benchmark_hybrid.csv`.
+Median over 3 seeds:
+
+| family | hybrid-8 | hybrid-32 | best PINN (April table) |
+|---|---|---|---|
+| VdP, c-family | 6.5e-3 | 2.7e-3 | shift-hard 1.4e-3 – 3.5e-3 |
+| pendulum, c-family | 3.9e-3 | 1.3e-3 | shift-hard **5.3e-4** |
+| Rayleigh, c-family | 3.5e-3 | 2.0e-3 | shift-hard **8.7e-5** |
+| VdP, mu | 3.2e-3 | **2.9e-3** | soft 4.9e-3 |
+| pendulum, damping | 3.0e-3 | **2.2e-3** | hard 3.5e-3 |
+
+Cost: ~40 s per surrogate (data generation < 1 s of that) vs ~10-20 min per
+PINN on the same CPU.
+
+Honest reading:
+* With a cheap, accurate ODE solver available, **the data-driven surrogate is
+  the better tool for the parametric families**: better or equal accuracy at
+  ~20x less compute. The PINN's "no data needed" advantage is weak when data
+  costs one second.
+* On c-families the symmetric PINN is more accurate (2.5x pendulum, 22x
+  Rayleigh, comparable on VdP) — but the surrogate does not exploit the
+  symmetry either. Fair follow-up: a surrogate that predicts Y(s) once and
+  shifts it ("shift-hybrid"); it would need ONE solve. Expect it to win.
+* So a paper cannot be "PINNs beat surrogates". Possible angles: (a) settings
+  where the solver is expensive or data unavailable; (b) the methodological
+  point that symmetry, not the learning paradigm, drives accuracy on these
+  families — for both PINNs and surrogates.
