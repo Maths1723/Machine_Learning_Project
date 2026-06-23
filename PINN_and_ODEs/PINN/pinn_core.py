@@ -133,33 +133,47 @@ class HardIC(nn.Module):
     u(t0) = g0 and u'(t0) = g1 for any N, so the IC penalties (and the alpha,
     beta weights) disappear. In particular u = 0 is no longer admissible
     when g0 != 0, which removes the trivial-solution trap of Van der Pol.
+
+    profile='saturating' replaces (s/T)^2 by phi(s) = 1 - exp(-(s/tau)^2):
+    same behaviour at s = 0 (phi = phi' = 0) but bounded, so N is not
+    multiplied by a factor growing like s^2 far from t0.
     """
 
     hard_ic = True
 
-    def __init__(self, base, problem):
+    def __init__(self, base, problem, profile="quadratic", tau=None):
         super().__init__()
+        if profile not in ("quadratic", "saturating"):
+            raise ValueError(f"unknown IC profile '{profile}'")
         self.base = base
         self.problem = problem
-        self.T = problem.t_max - problem.t_min
+        self.profile = profile
+        self.tau = tau if tau is not None else problem.t_max - problem.t_min
 
     def forward(self, t, p):
         s = t - self.problem.ic_point(p)
-        return self.problem.g0 + self.problem.g1 * s + (s / self.T) ** 2 * self.base(t, p)
+        z = (s / self.tau) ** 2
+        phi = z if self.profile == "quadratic" else 1 - torch.exp(-z)
+        return self.problem.g0 + self.problem.g1 * s + phi * self.base(t, p)
 
 
-def make_model(kind, problem, hidden=64, layers=4):
-    """'legacy' | 'soft' | 'hard' | 'shift' | 'shift-hard'."""
+def make_model(kind, problem, hidden=64, layers=4, ic_tau=1.0):
+    """'legacy' | 'soft' | 'hard' | 'shift' | 'shift-hard', and 'hard-sat' / 'shift-hard-sat'
+    (saturating IC profile with time scale ic_tau)."""
     if kind == "legacy":
         return ParametricPINN(problem, hidden, layers, normalize=False)
     if kind == "soft":
         return ParametricPINN(problem, hidden, layers)
     if kind == "hard":
         return HardIC(ParametricPINN(problem, hidden, layers), problem)
+    if kind == "hard-sat":
+        return HardIC(ParametricPINN(problem, hidden, layers), problem, "saturating", ic_tau)
     if kind == "shift":
         return ShiftPINN(problem, hidden, layers)
     if kind == "shift-hard":
         return HardIC(ShiftPINN(problem, hidden, layers), problem)
+    if kind == "shift-hard-sat":
+        return HardIC(ShiftPINN(problem, hidden, layers), problem, "saturating", ic_tau)
     raise ValueError(f"unknown model kind '{kind}'")
 
 

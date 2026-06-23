@@ -83,7 +83,7 @@ def test_configs_load_as_problems():
 
 def test_hard_ic_is_exact_for_untrained_network():
     torch.manual_seed(1)
-    for kind in ("hard", "shift-hard"):
+    for kind in ("hard", "shift-hard", "hard-sat", "shift-hard-sat"):
         model = make_model(kind, HARMONIC, hidden=16, layers=2)
         l0, l1 = ic_loss(model, HARMONIC, torch.tensor([[0.0], [0.4], [1.7]]))
         assert l0 < 1e-12 and l1 < 1e-10, kind
