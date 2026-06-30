@@ -162,3 +162,22 @@ Honest reading:
   where the solver is expensive or data unavailable; (b) the methodological
   point that symmetry, not the learning paradigm, drives accuracy on these
   families — for both PINNs and surrogates.
+
+## 2026-06-30 · The c-family benchmark is (too) easy for any method that knows the symmetry
+
+Follow-up to the "shift-hybrid" idea: under y(t; c) = Y(t - c) no network is
+needed at all. One DOP853 solve of Y on s in [t_min - c_max, t_max - c_min]
+plus linear interpolation on a 4001-point s-grid gives the whole family with
+rel. L2 error ~1e-6 (VdP 1.2e-6, pendulum 1.6e-6, Rayleigh 7.9e-7; limited by
+the interpolation, not the solver) in < 0.05 s. So on c-families:
+
+* any learned surrogate that does not use the symmetry is solving an
+  artificially hard problem (that is what the 2025 report did);
+* any method that does use it reduces to a single IVP, and the comparison
+  becomes "PINN vs classical solver on one IVP", which the solver wins.
+
+Consequence for the paper: c-families are useful as a *didactic* example of
+how symmetry turns a failing PINN into a working one, not as evidence that
+PINNs are competitive. Real tests need families without the symmetry:
+parameters inside f (done: VdP-mu, pendulum damping) and non-autonomous
+forcing (next).
