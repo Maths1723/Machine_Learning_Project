@@ -125,6 +125,33 @@ class ShiftPINN(nn.Module):
         return self.net((t - p - self.s_mid) / self.s_half)
 
 
+class RelativePINN(nn.Module):
+    """u(t, p) = N(s_hat, p_hat) with s = t - t0(p): relative-time coordinates.
+
+    Same information as ParametricPINN, different coordinates. For autonomous
+    c-families the exact solution depends on s only, so this model CAN
+    represent the symmetry but is not forced to (ShiftPINN is). Ablation for
+    "is it the coordinates or the exact equivariance?", and the natural
+    choice when the symmetry is broken (non-autonomous forcing).
+    """
+
+    def __init__(self, problem, hidden=64, layers=4):
+        super().__init__()
+        self.problem = problem
+        self.net = mlp(2, 1, hidden, layers)
+        if problem.ic_at_param:
+            s_lo, s_hi = problem.t_min - problem.p_max, problem.t_max - problem.p_min
+        else:
+            s_lo, s_hi = problem.t_min - problem.t0_fixed, problem.t_max - problem.t0_fixed
+        p_mid, p_half = (problem.p_max + problem.p_min) / 2, max((problem.p_max - problem.p_min) / 2, 1e-12)
+        self.register_buffer("shift", torch.tensor([(s_hi + s_lo) / 2, p_mid]))
+        self.register_buffer("scale", torch.tensor([max((s_hi - s_lo) / 2, 1e-12), p_half]))
+
+    def forward(self, t, p):
+        s = t - self.problem.ic_point(p)
+        return self.net((torch.cat([s, p], dim=1) - self.shift) / self.scale)
+
+
 class HardIC(nn.Module):
     """Wraps a model so that the initial conditions hold exactly:
 
@@ -158,7 +185,7 @@ class HardIC(nn.Module):
 
 
 def make_model(kind, problem, hidden=64, layers=4, ic_tau=1.0):
-    """'legacy' | 'soft' | 'hard' | 'shift' | 'shift-hard', and 'hard-sat' / 'shift-hard-sat'
+    """'legacy' | 'soft' | 'hard' | 'rel' | 'rel-hard' | 'shift' | 'shift-hard', and 'hard-sat' / 'shift-hard-sat'
     (saturating IC profile with time scale ic_tau)."""
     if kind == "legacy":
         return ParametricPINN(problem, hidden, layers, normalize=False)
@@ -168,6 +195,10 @@ def make_model(kind, problem, hidden=64, layers=4, ic_tau=1.0):
         return HardIC(ParametricPINN(problem, hidden, layers), problem)
     if kind == "hard-sat":
         return HardIC(ParametricPINN(problem, hidden, layers), problem, "saturating", ic_tau)
+    if kind == "rel":
+        return RelativePINN(problem, hidden, layers)
+    if kind == "rel-hard":
+        return HardIC(RelativePINN(problem, hidden, layers), problem)
     if kind == "shift":
         return ShiftPINN(problem, hidden, layers)
     if kind == "shift-hard":

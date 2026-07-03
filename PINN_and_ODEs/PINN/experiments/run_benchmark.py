@@ -52,7 +52,7 @@ def run_one(config_path, kind, seed, args):
     if kind.startswith("hybrid-"):
         return run_hybrid(problem, kind, seed, args)
     torch.manual_seed(seed)
-    model = make_model(kind, problem, hidden=args.hidden, layers=args.layers)
+    model = make_model(kind, problem, hidden=args.hidden, layers=args.layers, ic_tau=args.ic_tau)
     overrides = dict(LEGACY) if kind == "legacy" else dict(curriculum=args.curriculum, causal_eps=args.causal_eps,
                                                                lbfgs_steps=args.lbfgs)
     cfg = TrainConfig(epochs=args.epochs, lr=args.lr, seed=seed, log_every=max(args.epochs // 4, 1), **overrides)
@@ -81,6 +81,7 @@ def main():
     ap.add_argument("--lbfgs", type=int, default=0, help="L-BFGS refinement iterations after Adam")
     ap.add_argument("--curriculum", type=float, default=0.0)
     ap.add_argument("--causal-eps", type=float, default=0.0)
+    ap.add_argument("--ic-tau", type=float, default=1.0, help="time scale of the saturating IC profile (*-sat kinds)")
     ap.add_argument("--surrogate-epochs", type=int, default=5000)
     ap.add_argument("--n-eval", type=int, default=21)
     ap.add_argument("--csv-name", default="benchmark.csv")

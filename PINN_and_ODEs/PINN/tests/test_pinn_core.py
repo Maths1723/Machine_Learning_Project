@@ -83,7 +83,7 @@ def test_configs_load_as_problems():
 
 def test_hard_ic_is_exact_for_untrained_network():
     torch.manual_seed(1)
-    for kind in ("hard", "shift-hard", "hard-sat", "shift-hard-sat"):
+    for kind in ("hard", "shift-hard", "hard-sat", "shift-hard-sat", "rel-hard"):
         model = make_model(kind, HARMONIC, hidden=16, layers=2)
         l0, l1 = ic_loss(model, HARMONIC, torch.tensor([[0.0], [0.4], [1.7]]))
         assert l0 < 1e-12 and l1 < 1e-10, kind
@@ -115,3 +115,16 @@ def test_curriculum_window_contains_ic_point():
     t, p = sample_points(HARMONIC, cfg, torch.Generator().manual_seed(0), "cpu", radius=0.5)
     assert torch.all((t - p).abs() <= 0.5 + 1e-6)
     assert t.min() >= HARMONIC.t_min and t.max() <= HARMONIC.t_max
+
+
+def test_relative_model_sees_t_minus_c():
+    torch.manual_seed(3)
+    model = make_model("rel", HARMONIC, hidden=16, layers=2)
+    t = torch.linspace(1.0, 4.0, 7).reshape(-1, 1)
+    # inputs map into the unit box over the whole (s, p) range
+    s_hat = ((t - 0.5) - model.shift[0]) / model.scale[0]
+    assert torch.all(s_hat.abs() <= 1 + 1e-6)
+    # not equivariant by construction: changing c at fixed t - c changes u
+    a = model(t, torch.full_like(t, 0.5))
+    b = model(t + 1.0, torch.full_like(t, 1.5))
+    assert not torch.allclose(a, b, atol=1e-6)
