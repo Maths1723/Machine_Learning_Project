@@ -181,3 +181,23 @@ how symmetry turns a failing PINN into a working one, not as evidence that
 PINNs are competitive. Real tests need families without the symmetry:
 parameters inside f (done: VdP-mu, pendulum damping) and non-autonomous
 forcing (next).
+
+## 2026-07-14 · Bounded IC profile fixes the VdP-mu regression
+
+April's hard ICs were worse than soft on VdP-mu. Hypothesis: the factor
+(s/T)^2 multiplies the network output by up to 1 at the end of the interval
+and makes late-time corrections stiff. New `HardIC(profile="saturating")`:
+u = g0 + g1 s + (1 - exp(-(s/tau)^2)) N, tau = 1. Same budget as April, 3
+seeds (`results/benchmark_summer.csv`):
+
+| family | soft (Apr) | hard, quadratic (Apr) | **hard, saturating** | hybrid-32 (Jun) |
+|---|---|---|---|---|
+| VdP, mu | 4.9e-3 | 1.1e-2 | **1.1e-3** (worst 8.2e-3) | 2.9e-3 |
+| pendulum, damping | 5.9e-2 | 3.5e-3 | **2.4e-3** (worst 2.1e-2) | 2.2e-3 |
+
+The quadratic profile was the problem: with the bounded one, hard ICs are
+4x better than soft on VdP-mu and **2.6x better than the data-driven
+surrogate** — the first parametric family where the PINN wins on accuracy
+(it still costs ~20x more compute). On the pendulum it ties the surrogate.
+tau = 1 was not tuned; the worst-case (max over p) errors are still 7-9x
+the medians, concentrated at the ends of the parameter range.
