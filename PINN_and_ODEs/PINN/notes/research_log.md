@@ -201,3 +201,22 @@ surrogate** — the first parametric family where the PINN wins on accuracy
 (it still costs ~20x more compute). On the pendulum it ties the surrogate.
 tau = 1 was not tuned; the worst-case (max over p) errors are still 7-9x
 the medians, concentrated at the ends of the parameter range.
+
+## 2026-07-28 · Coordinates or symmetry? (RelativePINN ablation)
+
+`rel-hard`: hard ICs + network on (t - c, c). It can represent y = Y(t - c)
+but is not forced to. Same budget, 3 seeds, c-families:
+
+| family | soft | hard (t, c) | **rel-hard (t - c, c)** | shift-hard (t - c only) |
+|---|---|---|---|---|
+| VdP | 1.00 | 1.6e-2 (worst 0.62) | 1.2e-2 (worst 0.80) | **3.5e-3** (worst 5.6e-3) |
+| pendulum | 2.5e-2 | – | 3.1e-3 (worst 1.2e-2) | **5.3e-4** (worst 1.0e-3) |
+| Rayleigh | 7.2e-4 | – | 3.2e-4 (worst 1.4e-3) | **8.7e-5** (worst 2.5e-4) |
+
+* The coordinates alone give a real but partial gain: 2-8x over soft ICs on
+  pendulum/Rayleigh, about the same as plain hard ICs on VdP.
+* They do **not** give robustness: one of three VdP seeds fails (0.45 median),
+  exactly the seed-dependence plain hard ICs showed in April.
+* Exact equivariance is what makes it reliable and 3-6x more accurate.
+  The network that is *allowed* to ignore c does not learn to ignore it
+  within this budget.
