@@ -220,3 +220,28 @@ but is not forced to. Same budget, 3 seeds, c-families:
 * Exact equivariance is what makes it reliable and 3-6x more accurate.
   The network that is *allowed* to ignore c does not learn to ignore it
   within this budget.
+
+## 2026-08-14 · Forced pendulum: what survives when the symmetry breaks
+
+`forced_pendulum.py`: y'' + 0.2 y' + sin y = 0.5 cos(1.2 t), y(c) = 0.5,
+y'(c) = 0, c in [0, 2], t in [0, 15]. Non-autonomous, so y(t; c) != Y(t - c).
+Same budget, 3 seeds:
+
+| method | median rel. L2 | worst seed, max over c |
+|---|---|---|
+| soft | 1.0e-2 | 4.0e-2 |
+| **hard (t, c)** | **1.1e-3** | 7.2e-3 |
+| rel-hard (t - c, c) | 1.4e-3 | 4.6e-3 |
+| shift-hard (t - c only) | 0.54 | 0.98 |
+| hybrid-8 | 2.6e-3 | 1.8e-2 |
+| hybrid-32 | 1.4e-3 | 3.4e-3 |
+
+* shift-hard fails on every seed (0.54, identical across seeds): it can only
+  represent translates of one function, which this family is not. Expected,
+  and a useful negative control — the April gains were not an artefact.
+* Hard ICs are the ingredient that transfers: 9x better than soft, on par
+  with the surrogate trained on 32 solutions (and better than 8).
+* rel-hard is not better than plain hard here; the coordinates mattered
+  only through the symmetry.
+* No trap here (y = 0 is not a solution of the forced equation), so soft ICs
+  "work" but are an order of magnitude less accurate.
