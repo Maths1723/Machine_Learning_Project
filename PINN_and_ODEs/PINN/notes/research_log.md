@@ -245,3 +245,27 @@ Same budget, 3 seeds:
   only through the symmetry.
 * No trap here (y = 0 is not a solution of the forced equation), so soft ICs
   "work" but are an order of magnitude less accurate.
+
+## 2026-08-31 · Stiff Van der Pol: every PINN variant fails
+
+`parametric_vdp_mu_stiff.py`: mu in [2, 5], y(0) = 1, y'(0) = 0, t in [0, 20]
+(relaxation oscillations, fronts of width ~1/mu). Same budget, 3 seeds:
+
+| method | median rel. L2 | worst |
+|---|---|---|
+| soft | 1.03 | 1.06 |
+| hard (quadratic) | 1.04 | 1.09 |
+| hard (saturating) | 1.21 | 1.41 |
+| hybrid-8 | 8.8e-2 | 0.14 |
+| hybrid-32 | 1.5e-2 | 3.6e-2 |
+
+* All PINNs fail on all seeds (errors >= 1). For hard ICs u = 0 is excluded
+  by construction, so this is not the trivial-solution trap; whether it is a
+  wrong period or a smoothed-out solution was not checked yet (plot needed).
+* The surrogate degrades too (5x worse than on mu in [0.5, 2]) but remains
+  usable with 32 samples.
+* Not a surprise: the 6000-step budget, fixed 4x64 tanh network and uniform
+  collocation are all poorly suited to sharp fronts. Before calling it a
+  limitation of the method we would
+  need adaptive collocation (residual-based resampling) and a longer budget —
+  out of scope for now. Report it as a limitation of this setup.
