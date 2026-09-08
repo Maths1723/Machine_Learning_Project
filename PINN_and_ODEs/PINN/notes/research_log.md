@@ -269,3 +269,19 @@ Same budget, 3 seeds:
   limitation of the method we would
   need adaptive collocation (residual-based resampling) and a longer budget —
   out of scope for now. Report it as a limitation of this setup.
+
+## 2026-09-08 · Five seeds on the Van der Pol c-family
+
+Seeds 3 and 4 added (curriculum + L-BFGS, same budget), pooled with April's
+seeds 0-2. Median rel. L2 per seed:
+
+| model | seed 0 | 1 | 2 | 3 | 4 | runs < 2e-2 |
+|---|---|---|---|---|---|---|
+| soft | 1.01 | 1.00 | 1.00 | 1.00 | 1.06 | 0/5 |
+| hard | 1.6e-2 | 4.3e-3 | 0.29 | 5.2e-3 | 1.0e-2 | 4/5 |
+| shift-hard | 3.5e-3 | 3.9e-4 | 4.9e-3 | 4.6e-3 | 1.3e-3 | **5/5** |
+
+Unchanged conclusions with more seeds: soft ICs never escape the trap (8/8
+soft runs over both training settings), hard ICs usually do but not always,
+shift-hard always does. Five seeds is still small; for a paper use >= 10
+and report success rates with intervals.
