@@ -14,6 +14,12 @@ Short version (details and numbers in `notes/research_log.md`):
   with exactly enforced initial conditions, solves every c-family on every seed
   (relative L2 error 1e-4 to 1e-3 on pendulum and Rayleigh, <= 1.4e-2 on Van der Pol).
 
+Summer 2026 update: the u = 0 trap turned out to be known in the literature
+(see `notes/related_work.md`); on families *without* the symmetry, exact ICs
+with a bounded profile make the PINN competitive with the report's data-driven
+surrogate (better on VdP with varying mu, on par elsewhere) at ~20x the compute.
+Stiff Van der Pol (mu up to 5) is still unsolved. Full tables: `notes/research_log.md`.
+
 | file | what |
 |---|---|
 | `main.py` | interactive tool; `(p)` -> `(i)mproved` uses the new PINN, `(t)` plots the true error |
@@ -23,6 +29,10 @@ Short version (details and numbers in `notes/research_log.md`):
 | `experiments/run_benchmark.py` | reproducible benchmark -> `results/benchmark.csv` |
 | `experiments/summarize.py` | table + figure from the CSV |
 | `tests/` | `pytest tests` |
+| `surrogate.py` | the report's data-driven model as a baseline (`hybrid-N` in the benchmark) |
+| `forced_pendulum.py`, `parametric_vdp_mu_stiff.py` | summer 2026 configs: broken symmetry, stiff regime |
+| `experiments/make_figures.py` | `results/figures/` |
+| `notes/` | `research_log.md` (dated results), `related_work.md`, `paper_outline.md` |
 
 ```bash
 pip install -r requirements.txt
