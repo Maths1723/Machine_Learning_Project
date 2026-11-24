@@ -1,4 +1,4 @@
-# main_ode_trainer.py (FINAL VERSION with corrected plot_denoiser_flux to only show NN output with varied colors and added error norm plotting)
+# main.py (FINAL VERSION with corrected plot_denoiser_flux to only show NN output with varied colors and added error norm plotting)
 # --- MODIFIED TO INCLUDE NO-DATA (PINN) TRAINING ---
 # - - - libs - - -
 import os
@@ -765,259 +765,260 @@ def denoise_data():
                                      x_eval_points_for_denoise, noisy_full_dataset, denoiser_model_path, input_param_name_in_mat)
 
 # --- Main Program Control Loop ---
-select_ode_func = True
-while select_ode_func:
-    # Reset global parameters
-    ode_func_file_path = ""
-    input_param_name_in_mat = ""
-    ode_function = None
-    GLOBAL_Y0_FIXED_AT_C, GLOBAL_Y_PRIME0_FIXED_AT_C = None, None
-    FIXED_IC_POINT = None
-    PARAM_MIN_LOADED, PARAM_MAX_LOADED, NUM_PARAM_VALUES_LOADED = None, None, None
-    X_EVAL_START_LOADED, X_EVAL_END_LOADED, NUM_X_EVAL_POINTS_LOADED = None, None, None
+if __name__ == "__main__":
+    select_ode_func = True
+    while select_ode_func:
+        # Reset global parameters
+        ode_func_file_path = ""
+        input_param_name_in_mat = ""
+        ode_function = None
+        GLOBAL_Y0_FIXED_AT_C, GLOBAL_Y_PRIME0_FIXED_AT_C = None, None
+        FIXED_IC_POINT = None
+        PARAM_MIN_LOADED, PARAM_MAX_LOADED, NUM_PARAM_VALUES_LOADED = None, None, None
+        X_EVAL_START_LOADED, X_EVAL_END_LOADED, NUM_X_EVAL_POINTS_LOADED = None, None, None
 
-    # --- Dynamic ODE Function and Problem Parameters Loading ---
-    ode_func_file_path = select_ode_config()
-    if ode_func_file_path is None:
-        break
-    try:
-        spec = importlib.util.spec_from_file_location("ode_module", ode_func_file_path)
-        ode_module = importlib.util.module_from_spec(spec)
-        sys.modules["ode_module"] = ode_module
-        spec.loader.exec_module(ode_module)
+        # --- Dynamic ODE Function and Problem Parameters Loading ---
+        ode_func_file_path = select_ode_config()
+        if ode_func_file_path is None:
+            break
+        try:
+            spec = importlib.util.spec_from_file_location("ode_module", ode_func_file_path)
+            ode_module = importlib.util.module_from_spec(spec)
+            sys.modules["ode_module"] = ode_module
+            spec.loader.exec_module(ode_module)
         
-        ode_function = ode_module.ode_system
-        input_param_name_in_mat = ode_module.PARAM_NAME_IN_MAT_FILE
-        print(f"Loaded ODE function from '{ode_func_file_path}' for parameter '{input_param_name_in_mat}'.")
+            ode_function = ode_module.ode_system
+            input_param_name_in_mat = ode_module.PARAM_NAME_IN_MAT_FILE
+            print(f"Loaded ODE function from '{ode_func_file_path}' for parameter '{input_param_name_in_mat}'.")
 
-        GLOBAL_Y0_FIXED_AT_C = ode_module.FIXED_Y0
-        GLOBAL_Y_PRIME0_FIXED_AT_C = ode_module.FIXED_Y_PRIME0
-        if hasattr(ode_module, 'X_START_IC_POINT'):
-            FIXED_IC_POINT = ode_module.X_START_IC_POINT
+            GLOBAL_Y0_FIXED_AT_C = ode_module.FIXED_Y0
+            GLOBAL_Y_PRIME0_FIXED_AT_C = ode_module.FIXED_Y_PRIME0
+            if hasattr(ode_module, 'X_START_IC_POINT'):
+                FIXED_IC_POINT = ode_module.X_START_IC_POINT
         
-        PARAM_MIN_LOADED = ode_module.PARAM_MIN_VALUE
-        PARAM_MAX_LOADED = ode_module.PARAM_MAX_VALUE
-        NUM_PARAM_VALUES_LOADED = ode_module.NUM_PARAM_VALUES_GEN
-        X_EVAL_START_LOADED = ode_module.X_EVAL_START_GEN
-        X_EVAL_END_LOADED = ode_module.X_EVAL_END_GEN
-        NUM_X_EVAL_POINTS_LOADED = ode_module.NUM_X_EVAL_POINTS_GEN
-    except Exception as e:
-        print(f"Error loading ODE file: {e}. Please ensure it contains all required variables.")
-        continue
+            PARAM_MIN_LOADED = ode_module.PARAM_MIN_VALUE
+            PARAM_MAX_LOADED = ode_module.PARAM_MAX_VALUE
+            NUM_PARAM_VALUES_LOADED = ode_module.NUM_PARAM_VALUES_GEN
+            X_EVAL_START_LOADED = ode_module.X_EVAL_START_GEN
+            X_EVAL_END_LOADED = ode_module.X_EVAL_END_GEN
+            NUM_X_EVAL_POINTS_LOADED = ode_module.NUM_X_EVAL_POINTS_GEN
+        except Exception as e:
+            print(f"Error loading ODE file: {e}. Please ensure it contains all required variables.")
+            continue
 
-    program_running = True
-    while program_running:
-        action_choice = get_user_choice(
-            "Do you want to (p)hysics-informed training (no data), (g)enerate/load data and train, (n)oise data, (d)train NN on noisy data, (o)de function select, or (q)uit program? [p/g/n/d/o/q]: ",
-            ['p', 'g', 'n', 'd', 'o', 'q']
-        )
+        program_running = True
+        while program_running:
+            action_choice = get_user_choice(
+                "Do you want to (p)hysics-informed training (no data), (g)enerate/load data and train, (n)oise data, (d)train NN on noisy data, (o)de function select, or (q)uit program? [p/g/n/d/o/q]: ",
+                ['p', 'g', 'n', 'd', 'o', 'q']
+            )
         
-        if action_choice == 'p':
-            menu_result_pinn = train_with_no_data()
-            if menu_result_pinn == 'quit_program':
-                program_running = False
-                select_ode_func = False
+            if action_choice == 'p':
+                menu_result_pinn = train_with_no_data()
+                if menu_result_pinn == 'quit_program':
+                    program_running = False
+                    select_ode_func = False
 
-        elif action_choice == 'g':
-            generate_data_choice = get_user_choice("Do you have a pre-generated data file (y/n)? ", ['y', 'n'])
+            elif action_choice == 'g':
+                generate_data_choice = get_user_choice("Do you have a pre-generated data file (y/n)? ", ['y', 'n'])
 
-            if generate_data_choice == 'y':
-                mat_data_path = clean_path(input("Enter the path to the .mat data file: "))
-                if not os.path.exists(mat_data_path):
-                    print(f"Error: Data file '{mat_data_path}' not found. Returning.")
-                    continue 
-            else:
-                mat_data_path = generate_data_and_save()
-                if mat_data_path is None:
-                    print("Data generation failed. Returning.")
-                    continue
-
-            try:
-                full_dataset = ODESolutionDataset(mat_data_path, input_param_name_in_mat)
-            except Exception as e:
-                print(f"Error loading dataset from '{mat_data_path}': {e}. Returning.")
-                continue
-
-            x_eval_points = full_dataset.x_evaluation_points
-            y0_fixed_from_data = full_dataset.y0
-            y_prime0_fixed_from_data = full_dataset.y_prime0
-            x_end_plot_range = x_eval_points[-1]    
-
-            criterion = CustomODELoss(alpha=0.0, beta=0.0, x_eval_points=x_eval_points, 
-                                      y0_fixed_at_c=y0_fixed_from_data, y_prime0_fixed_at_c=y_prime0_fixed_from_data)
-
-            train_size = int(0.8 * len(full_dataset))
-            test_size = len(full_dataset) - train_size
-            train_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [train_size, test_size])
-            train_loader = DataLoader(dataset=train_dataset, batch_size=32, shuffle=True)
-            test_loader = DataLoader(dataset=test_dataset, batch_size=32, shuffle=False)
-            model = ODE_MLP(output_dim=len(x_eval_points)).to(device)
-            optimizer = torch.optim.Adam(model.parameters())
-
-            train_or_load_choice = get_user_choice("Do you want to (t)rain a new model or (l)oad a saved model? [t/l]: ", ['t', 'l'])
-            model_path = f"ode_mlp_{os.path.basename(mat_data_path).replace('.mat','')}.pth"
-            if train_or_load_choice == 't':
-                epochs = 200
-                for epoch in range(epochs):
-                    print(f"Training epoch {epoch + 1}/{epochs}")
-                    train(train_loader, model, criterion, optimizer, device)
-                    if (epoch + 1) % 10 == 0:
-                        test(test_loader, model, criterion, device)
-                save_model(model, model_path)
-            else: # 'l'
-                if os.path.exists(model_path):
-                    model.load_state_dict(torch.load(model_path, map_location=device))
-                    print(f"Model loaded from {model_path}")
+                if generate_data_choice == 'y':
+                    mat_data_path = clean_path(input("Enter the path to the .mat data file: "))
+                    if not os.path.exists(mat_data_path):
+                        print(f"Error: Data file '{mat_data_path}' not found. Returning.")
+                        continue 
                 else:
-                    print(f"No saved model found at {model_path}. Returning.")
+                    mat_data_path = generate_data_and_save()
+                    if mat_data_path is None:
+                        print("Data generation failed. Returning.")
+                        continue
+
+                try:
+                    full_dataset = ODESolutionDataset(mat_data_path, input_param_name_in_mat)
+                except Exception as e:
+                    print(f"Error loading dataset from '{mat_data_path}': {e}. Returning.")
                     continue
 
-            print("\n--- Final Test Set Evaluation ---")
-            test(test_loader, model, criterion, device)
-            model.eval() 
-            param_label = input_param_name_in_mat.replace('_values', '')
+                x_eval_points = full_dataset.x_evaluation_points
+                y0_fixed_from_data = full_dataset.y0
+                y_prime0_fixed_from_data = full_dataset.y_prime0
+                x_end_plot_range = x_eval_points[-1]    
 
-            def plot_single_solution():
-                print(f"\n--- Plotting Predicted Solutions for user-defined '{param_label}' ---")
-                while True:
-                    user_param_input = input(f"Enter a value for '{param_label}' (or 'q' to quit): ")
-                    if user_param_input.lower() == 'q': break
+                criterion = CustomODELoss(alpha=0.0, beta=0.0, x_eval_points=x_eval_points, 
+                                          y0_fixed_at_c=y0_fixed_from_data, y_prime0_fixed_at_c=y_prime0_fixed_from_data)
+
+                train_size = int(0.8 * len(full_dataset))
+                test_size = len(full_dataset) - train_size
+                train_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [train_size, test_size])
+                train_loader = DataLoader(dataset=train_dataset, batch_size=32, shuffle=True)
+                test_loader = DataLoader(dataset=test_dataset, batch_size=32, shuffle=False)
+                model = ODE_MLP(output_dim=len(x_eval_points)).to(device)
+                optimizer = torch.optim.Adam(model.parameters())
+
+                train_or_load_choice = get_user_choice("Do you want to (t)rain a new model or (l)oad a saved model? [t/l]: ", ['t', 'l'])
+                model_path = f"ode_mlp_{os.path.basename(mat_data_path).replace('.mat','')}.pth"
+                if train_or_load_choice == 't':
+                    epochs = 200
+                    for epoch in range(epochs):
+                        print(f"Training epoch {epoch + 1}/{epochs}")
+                        train(train_loader, model, criterion, optimizer, device)
+                        if (epoch + 1) % 10 == 0:
+                            test(test_loader, model, criterion, device)
+                    save_model(model, model_path)
+                else: # 'l'
+                    if os.path.exists(model_path):
+                        model.load_state_dict(torch.load(model_path, map_location=device))
+                        print(f"Model loaded from {model_path}")
+                    else:
+                        print(f"No saved model found at {model_path}. Returning.")
+                        continue
+
+                print("\n--- Final Test Set Evaluation ---")
+                test(test_loader, model, criterion, device)
+                model.eval() 
+                param_label = input_param_name_in_mat.replace('_values', '')
+
+                def plot_single_solution():
+                    print(f"\n--- Plotting Predicted Solutions for user-defined '{param_label}' ---")
+                    while True:
+                        user_param_input = input(f"Enter a value for '{param_label}' (or 'q' to quit): ")
+                        if user_param_input.lower() == 'q': break
+                        try:
+                            param_val = float(user_param_input)
+                            param_tensor = torch.tensor([[param_val]], dtype=torch.float32).to(device)
+                            with torch.no_grad():
+                                predicted_solution = model(param_tensor).squeeze().cpu().numpy()
+                        
+                            ode_func_for_scipy_plotting = lambda t, y: ode_function(t, y, param_val)
+                            if input_param_name_in_mat == 'c_values':
+                                solver_x_start_for_ic_plotting = param_val
+                            else:
+                                solver_x_start_for_ic_plotting = FIXED_IC_POINT
+                        
+                            scipy_solution = solve_ode_numerically(
+                                ode_func_for_scipy_plotting, [y0_fixed_from_data, y_prime0_fixed_from_data],
+                                solver_x_start_for_ic_plotting, x_end_plot_range, x_eval_points
+                            )
+                        
+                            plt.figure(figsize=(12, 7))
+                            plt.plot(x_eval_points, predicted_solution, label='NN Predicted Solution', color='red', linestyle='-')
+                            plt.plot(x_eval_points, scipy_solution, label='SciPy Numerical Solution (validation)', color='green', linestyle=':', linewidth=2)
+                        
+                            if input_param_name_in_mat == 'c_values':
+                                plt.axvline(x=param_val, color='gray', linestyle=':', label=f'Initial Condition Point c={param_val:.2f}')
+                            else:
+                                plt.axvline(x=FIXED_IC_POINT, color='gray', linestyle=':', label=f'Initial Condition Point x={FIXED_IC_POINT:.2f}')
+
+                            plt.title(f"Solution for {param_label} = {param_val:.2f}")
+                            plt.xlabel("x")
+                            plt.ylabel("y(x)")
+                            plt.legend()
+                            plt.grid(True)
+                            plt.show()
+                        except ValueError:
+                            print(f"Invalid input. Please enter a numerical value for '{param_label}' or 'q'.")
+                        except Exception as e:
+                            print(f"An error occurred during plotting: {e}")
+                            print("This might be due to the ODE's behavior or choice of input value.")
+                    print("Exiting plotting mode.")
+
+                def plot_flux():
+                    print(f"\n--- Plotting Solution Flux for '{param_label}' ---")
                     try:
-                        param_val = float(user_param_input)
-                        param_tensor = torch.tensor([[param_val]], dtype=torch.float32).to(device)
-                        with torch.no_grad():
+                        num_flux_lines = int(input("Enter the number of solutions to plot for the flux (e.g., 5 or 10): "))
+                        if num_flux_lines <= 0: raise ValueError
+                    except ValueError:
+                        print("Invalid number. Please enter a positive integer.")
+                        return
+
+                    min_param = full_dataset.input_param_values.min().item()
+                    max_param = full_dataset.input_param_values.max().item()
+                    flux_param_values = np.linspace(min_param, max_param, num_flux_lines)
+
+                    plt.figure(figsize=(14, 8))
+                    plt.title(f"ODE Solution Flux (NN Prediction vs. SciPy) for varying {param_label}")
+                    plt.xlabel("x"); plt.ylabel("y(x)"); plt.grid(True)
+
+                    with torch.no_grad():
+                        for i, param_val in enumerate(flux_param_values):
+                            param_tensor = torch.tensor([[param_val]], dtype=torch.float32).to(device)
                             predicted_solution = model(param_tensor).squeeze().cpu().numpy()
                         
-                        ode_func_for_scipy_plotting = lambda t, y: ode_function(t, y, param_val)
-                        if input_param_name_in_mat == 'c_values':
-                            solver_x_start_for_ic_plotting = param_val
-                        else:
-                            solver_x_start_for_ic_plotting = FIXED_IC_POINT
+                            if input_param_name_in_mat == 'c_values':
+                                solver_x_start_for_ic_plotting = param_val
+                            else:
+                                solver_x_start_for_ic_plotting = FIXED_IC_POINT
                         
-                        scipy_solution = solve_ode_numerically(
-                            ode_func_for_scipy_plotting, [y0_fixed_from_data, y_prime0_fixed_from_data],
-                            solver_x_start_for_ic_plotting, x_end_plot_range, x_eval_points
-                        )
+                            ode_func_for_scipy_plotting = lambda t, y: ode_function(t, y, param_val)
+                            scipy_solution = solve_ode_numerically(
+                                ode_func_for_scipy_plotting, [y0_fixed_from_data, y_prime0_fixed_from_data],
+                                solver_x_start_for_ic_plotting, x_end_plot_range, x_eval_points
+                            )
                         
-                        plt.figure(figsize=(12, 7))
-                        plt.plot(x_eval_points, predicted_solution, label='NN Predicted Solution', color='red', linestyle='-')
-                        plt.plot(x_eval_points, scipy_solution, label='SciPy Numerical Solution (validation)', color='green', linestyle=':', linewidth=2)
+                            color = plt.cm.viridis(i / num_flux_lines)
+                            plt.plot(x_eval_points, predicted_solution, label=f'NN ({param_label}={param_val:.2f})', linestyle='-', alpha=0.7, color=color)
+                            plt.plot(x_eval_points, scipy_solution, label=f'SciPy ({param_label}={param_val:.2f})', linestyle='--', alpha=0.7, color=color)
                         
-                        if input_param_name_in_mat == 'c_values':
-                            plt.axvline(x=param_val, color='gray', linestyle=':', label=f'Initial Condition Point c={param_val:.2f}')
-                        else:
-                            plt.axvline(x=FIXED_IC_POINT, color='gray', linestyle=':', label=f'Initial Condition Point x={FIXED_IC_POINT:.2f}')
-
-                        plt.title(f"Solution for {param_label} = {param_val:.2f}")
-                        plt.xlabel("x")
-                        plt.ylabel("y(x)")
-                        plt.legend()
-                        plt.grid(True)
-                        plt.show()
-                    except ValueError:
-                        print(f"Invalid input. Please enter a numerical value for '{param_label}' or 'q'.")
-                    except Exception as e:
-                        print(f"An error occurred during plotting: {e}")
-                        print("This might be due to the ODE's behavior or choice of input value.")
-                print("Exiting plotting mode.")
-
-            def plot_flux():
-                print(f"\n--- Plotting Solution Flux for '{param_label}' ---")
-                try:
-                    num_flux_lines = int(input("Enter the number of solutions to plot for the flux (e.g., 5 or 10): "))
-                    if num_flux_lines <= 0: raise ValueError
-                except ValueError:
-                    print("Invalid number. Please enter a positive integer.")
-                    return
-
-                min_param = full_dataset.input_param_values.min().item()
-                max_param = full_dataset.input_param_values.max().item()
-                flux_param_values = np.linspace(min_param, max_param, num_flux_lines)
-
-                plt.figure(figsize=(14, 8))
-                plt.title(f"ODE Solution Flux (NN Prediction vs. SciPy) for varying {param_label}")
-                plt.xlabel("x"); plt.ylabel("y(x)"); plt.grid(True)
-
-                with torch.no_grad():
-                    for i, param_val in enumerate(flux_param_values):
-                        param_tensor = torch.tensor([[param_val]], dtype=torch.float32).to(device)
-                        predicted_solution = model(param_tensor).squeeze().cpu().numpy()
-                        
-                        if input_param_name_in_mat == 'c_values':
-                            solver_x_start_for_ic_plotting = param_val
-                        else:
-                            solver_x_start_for_ic_plotting = FIXED_IC_POINT
-                        
-                        ode_func_for_scipy_plotting = lambda t, y: ode_function(t, y, param_val)
-                        scipy_solution = solve_ode_numerically(
-                            ode_func_for_scipy_plotting, [y0_fixed_from_data, y_prime0_fixed_from_data],
-                            solver_x_start_for_ic_plotting, x_end_plot_range, x_eval_points
-                        )
-                        
-                        color = plt.cm.viridis(i / num_flux_lines)
-                        plt.plot(x_eval_points, predicted_solution, label=f'NN ({param_label}={param_val:.2f})', linestyle='-', alpha=0.7, color=color)
-                        plt.plot(x_eval_points, scipy_solution, label=f'SciPy ({param_label}={param_val:.2f})', linestyle='--', alpha=0.7, color=color)
-                        
-                        if input_param_name_in_mat == 'c_values':
-                            plt.axvline(x=param_val, color=color, linestyle=':', alpha=0.5)
+                            if input_param_name_in_mat == 'c_values':
+                                plt.axvline(x=param_val, color=color, linestyle=':', alpha=0.5)
                 
-                if input_param_name_in_mat != 'c_values' and FIXED_IC_POINT is not None:
-                    plt.axvline(x=FIXED_IC_POINT, color='gray', linestyle=':', label=f'Fixed IC Point x={FIXED_IC_POINT:.2f}')
+                    if input_param_name_in_mat != 'c_values' and FIXED_IC_POINT is not None:
+                        plt.axvline(x=FIXED_IC_POINT, color='gray', linestyle=':', label=f'Fixed IC Point x={FIXED_IC_POINT:.2f}')
 
-                plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize='small')
-                plt.tight_layout(); plt.show()
-                print("Exiting flux plotting mode.")
+                    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize='small')
+                    plt.tight_layout(); plt.show()
+                    print("Exiting flux plotting mode.")
 
-            while True:
-                plot_choice = get_user_choice("Do you want to plot a (s)ingle solution, plot the (f)lux, plot (e)rror norm, or (b)ack to main menu, (q)uit? [s/f/e/b/q]: ", ['s', 'f', 'e', 'b', 'q'])
-                if plot_choice == 's': plot_single_solution()
-                elif plot_choice == 'f': plot_flux()
-                elif plot_choice == 'e': plot_error_norm(model, full_dataset, input_param_name_in_mat, device)
-                elif plot_choice == 'b': break 
-                elif plot_choice == 'q':
+                while True:
+                    plot_choice = get_user_choice("Do you want to plot a (s)ingle solution, plot the (f)lux, plot (e)rror norm, or (b)ack to main menu, (q)uit? [s/f/e/b/q]: ", ['s', 'f', 'e', 'b', 'q'])
+                    if plot_choice == 's': plot_single_solution()
+                    elif plot_choice == 'f': plot_flux()
+                    elif plot_choice == 'e': plot_error_norm(model, full_dataset, input_param_name_in_mat, device)
+                    elif plot_choice == 'b': break 
+                    elif plot_choice == 'q':
+                        program_running = False 
+                        select_ode_func = False
+                        break 
+            
+            elif action_choice == 'n':
+                generate_for_noise_choice = get_user_choice("Do you want to (g)enerate the data first or (l)oad an existing clean data file to add noise to? [g/l]: ", ['g', 'l'])
+                original_data_file_for_noise = None
+                if generate_for_noise_choice == 'g':
+                    original_data_file_for_noise = generate_data_and_save()
+                    if original_data_file_for_noise is None:
+                        print("Data generation failed, cannot add noise. Returning.")
+                        continue
+                else: # 'l'
+                    original_data_file_for_noise = clean_path(input("Enter the path to the original (clean) .mat data file: "))
+                    if not os.path.exists(original_data_file_for_noise):
+                        print(f"Error: Data file '{original_data_file_for_noise}' not found. Returning.")
+                        continue
+                try:
+                    noise_std_for_add = float(input("Enter the standard deviation for the white noise to add (e.g., 0.01): "))
+                    if noise_std_for_add <= 0: raise ValueError
+                except ValueError:
+                    print("Invalid noise standard deviation. Please enter a positive number. Returning.")
+                    continue
+                add_noise(original_data_file_for_noise, noise_std_for_add)
+                continue
+
+            elif action_choice == 'd':
+                denoise_result = denoise_data()
+                if denoise_result == 'quit_program':
                     program_running = False 
                     select_ode_func = False
-                    break 
+                elif denoise_result == 'back_to_main':
+                    continue
             
-        elif action_choice == 'n':
-            generate_for_noise_choice = get_user_choice("Do you want to (g)enerate the data first or (l)oad an existing clean data file to add noise to? [g/l]: ", ['g', 'l'])
-            original_data_file_for_noise = None
-            if generate_for_noise_choice == 'g':
-                original_data_file_for_noise = generate_data_and_save()
-                if original_data_file_for_noise is None:
-                    print("Data generation failed, cannot add noise. Returning.")
-                    continue
-            else: # 'l'
-                original_data_file_for_noise = clean_path(input("Enter the path to the original (clean) .mat data file: "))
-                if not os.path.exists(original_data_file_for_noise):
-                    print(f"Error: Data file '{original_data_file_for_noise}' not found. Returning.")
-                    continue
-            try:
-                noise_std_for_add = float(input("Enter the standard deviation for the white noise to add (e.g., 0.01): "))
-                if noise_std_for_add <= 0: raise ValueError
-            except ValueError:
-                print("Invalid noise standard deviation. Please enter a positive number. Returning.")
+            elif action_choice == 'o':
+                program_running = False
                 continue
-            add_noise(original_data_file_for_noise, noise_std_for_add)
-            continue
 
-        elif action_choice == 'd':
-            denoise_result = denoise_data()
-            if denoise_result == 'quit_program':
-                program_running = False 
+            elif action_choice == 'q':
+                program_running = False
                 select_ode_func = False
-            elif denoise_result == 'back_to_main':
-                continue
             
-        elif action_choice == 'o':
-            program_running = False
-            continue
+        if not select_ode_func:
+            break
 
-        elif action_choice == 'q':
-            program_running = False
-            select_ode_func = False
-            
-    if not select_ode_func:
-        break
-
-print("\nProgram finished.")
+    print("\nProgram finished.")

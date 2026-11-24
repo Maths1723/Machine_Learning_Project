@@ -130,114 +130,51 @@ This hybrid loss steers the neural network to not only learn the solution curves
 
 ## How to Use the Project
 
-The `main.py` script orchestrates the entire workflow.
-
-### 1. Running the Trainer
-
-Execute the main script from your terminal:
-
 ```bash
 python main.py
 ```
 
-You will be prompted for several inputs:
+1. **Choose an ODE config** by number from the list, or type a path to another config file (`q` quits).
+2. **Choose an action:**
 
-a. ODE Function File Path:
-* **Prompt:** `Enter the path to the Python file defining the ODE function (e.g., 'ode_func_eq1.py' or 'ode_func_eq2.py'):`
-* **Input:** Provide the relative or absolute path to one of your ODE definition files, e.g., `ode_func_eq1.py` or `ode_func_eq2.py`.
-* **Explanation:** This dynamically loads the specific ODE system and its associated parameters (varying parameter range, fixed initial conditions, evaluation points) into the trainer.
-b. Data Source:
-* **Prompt:** `Do you have a pre-generated data file (y/n)?`
-* **Input:**
-    * `y`: If you have previously generated data and saved it as a `.mat` file. You will then be prompted to enter the path to this `.mat` file. This saves computation time for subsequent runs.
-    * `n`: To generate new data. The script will use the parameters defined within the chosen ODE function file (e.g., `ode_func_eq1.py`) to numerically solve the ODE for a range of parameter values and save them as a new `.mat` file.
-* **Explanation:** Data generation can be computationally intensive, especially for many parameter values or fine evaluation grids. Using pre-generated data allows for faster iteration on model training.
-c. Training or Loading a Model:
-* **Prompt:** `Do you want to (t)rain a new model or (l)oad a saved model? [t/l]:`
-* **Input:**
-    * `t`: To train a new neural network model from scratch using the loaded or generated data. The training process will display loss values per batch.
-    * `l`: To load a previously trained model (e.g., from an `.pth` file). This is useful for evaluating an already trained model or continuing training from a checkpoint.
-* **Explanation:** This choice allows for flexibility in your workflow, whether you're developing a new model or evaluating an existing one.
-2. Understanding Training Output
-During training (t option), you'll see output similar to:
+| key | action |
+|---|---|
+| `p` | PINN training without data: `(o)riginal` or `(i)mproved` |
+| `g` | generate or load a `.mat` dataset, then train or load the data-driven model |
+| `n` | add noise to a clean dataset |
+| `d` | train a network on noisy data |
+| `o` | choose another ODE config |
+| `q` | quit |
 
-Training epoch 1
-loss: 0.123456  [  32/ 800]
-loss: 0.087654  [ 640/ 800]
---- Epoch 10 Test ---
-Test Error: 
- Avg loss: 0.001234 
-loss: The CustomODELoss value for the current batch.
-[current/size]: Progress within the current epoch (current samples processed / total training samples).
-Test Error: The average loss calculated on the separate test dataset after every 10 epochs. This indicates how well the model generalizes to unseen data within the same distribution as the training data.
-3. Interactive Plotting and Evaluation
-After training or loading a model, the script enters an interactive plotting loop:
+**PINN (`p`).** The original method asks for the loss weights, epochs, learning rate
+and number of parameter values. The improved method asks for Adam epochs (default
+6000) and L-BFGS iterations (default 1000). Afterwards you can plot a single solution
+(`s`), the flux (`f`), the loss-based error norm (`e`) or the true error against SciPy (`t`).
 
-Prompt: Enter a value for 'c' (or 'q' to quit): (The parameter label, e.g., 'c' or 'k', will adapt based on PARAM_NAME_IN_MAT_FILE.)
-Input: Enter a numerical value for the varying parameter (e.g., 0.5, 1.2, 0.05) or q to quit.
-For each numerical input, a plot will be displayed showing three distinct curves:
+**Data-driven (`g`).** Trains for 200 epochs, printing the train loss every epoch and
+the test loss every 10. Afterwards you can plot a single solution (`s`), the flux (`f`)
+or the error norm (`e`); predictions are compared with a fresh SciPy solution.
+In `main.py` the loss for this model is plain MSE: the local `CustomODELoss` ignores
+the boundary terms described above.
 
-NN Predicted Solution (Red, Markers): This is the output of your trained neural network for the $c$ value you entered. It's the model's learned approximation.
-True Solution (from dataset) (Blue, Dashed): This curve represents the actual numerical solution from your training/test dataset for the $c$ value closest to your input $c$. This serves as the supervised learning target.
-SciPy Numerical Solution (validation) (Green, Dotted): This is a freshly computed numerical solution for the exact $c$ value you entered, calculated using scipy.integrate.solve_ivp. This is your independent, high-fidelity ground truth for validation.
-Important Considerations during Plotting:
+Parameter values outside the training range are extrapolation and can be far off.
 
-Interpolation vs. Extrapolation:
-If your input $c$ is within the PARAM_MIN_VALUE and PARAM_MAX_VALUE range defined in your ODE function file, expect the "NN Predicted Solution" to closely match both the "True Solution (from dataset)" (if one exists very close by) and the "SciPy Numerical Solution (validation)". This demonstrates successful interpolation.
-If your input $c$ is outside this training range, the script will issue a Warning: 'c' value is outside the training range [...]. In this case, the "NN Predicted Solution" might deviate significantly from the "SciPy Numerical Solution (validation)". This illustrates the limitations of neural networks in extrapolation. The "True Solution (from dataset)" will represent the data point closest to the training boundary, not the extrapolated point itself.
-Adding New ODE Function Files
-The project is designed to be extensible. To train a model for a new ODE:
+### Adding a new ODE
 
-Create a New Python File: Create a new .py file (e.g., ode_func_new.py) in the same directory as main.py.
+Add a `.py` file to this folder (it then appears in the menu) defining:
 
-Define Required Parameters: Inside this file, define all the required problem-specific parameters. Crucially, adhere strictly to the naming conventions:
+* `PARAM_NAME_IN_MAT_FILE` (use `'c_values'` when the parameter is the initial-condition point),
+  `PARAM_MIN_VALUE`, `PARAM_MAX_VALUE`, `NUM_PARAM_VALUES_GEN`
+* `FIXED_Y0`, `FIXED_Y_PRIME0`
+* `X_EVAL_START_GEN`, `X_EVAL_END_GEN`, `NUM_X_EVAL_POINTS_GEN`
+* `X_START_IC_POINT`, only if the initial conditions are at a fixed point
+* `ode_system(x, y, param_val)`, returning `[dy/dx, d2y/dx2]` with `y = [y, y']`
 
-PARAM_NAME_IN_MAT_FILE (e.g., 'alpha_values')
-PARAM_MIN_VALUE
-PARAM_MAX_VALUE
-NUM_PARAM_VALUES_GEN
-FIXED_Y0
-FIXED_Y_PRIME0
-X_EVAL_START_GEN
-X_EVAL_END_GEN
-NUM_X_EVAL_POINTS_GEN
-(Conditional) X_START_IC_POINT: Only define this if the initial conditions are fixed at a specific $x$ coordinate. Do NOT define it if the varying parameter (e.g., $c$) is the initial condition point itself.
-(Optional) Fixed ODE Coefficients: Define any other fixed coefficients used in your ODE (e.g., FIXED_GRAVITY = 9.81).
-Implement the ode_system Function:
+## Future Work and Enhancements
 
-The function signature must be ode_system(x, y, param_val).
-$x$ is the independent variable.
-$y$ is a list/array $[y, y']$.
-param_val is the current value of the parameter defined by PARAM_NAME_IN_MAT_FILE.
-Return a list [dy/dx, d2y/dx2]. For a second-order ODE, dy/dx will always be y[1].
-Handle Singularities: If your ODE involves division by $x$ or other terms that become undefined at certain points, include if checks within ode_system to return np.inf or np.nan (though it's best practice to set X_EVAL_START_GEN and PARAM_MIN_VALUE to avoid these points directly during data generation/evaluation).
-Run main.py: When prompted, provide the path to your new ODE function file.
-
-Customization and Hyperparameters
-You can customize the training process and neural network architecture by modifying main.py and SIMPLE_ode_support.py:
-
-In main.py:
-epochs: Number of full passes through the training dataset. More epochs can lead to better learning but also overfitting.
-batch_size: Number of samples processed in each training step. Larger batches might lead to more stable gradients but slower updates.
-optimizer_class: Change to torch.optim.SGD, torch.optim.AdamW, etc.
-alpha_coeff, beta_coeff: Coefficients for the boundary condition terms in CustomODELoss. Adjust these to control the emphasis on satisfying initial conditions. Higher values enforce BCs more strictly but might impact overall data fit.
-In SIMPLE_ode_support.py:
-ODE_MLP class:
-input_dim: Default is 1 (for the single varying parameter $c$).
-output_dim: Must match NUM_X_EVAL_POINTS_GEN from your ODE function file.
-hidden_layers: Number of hidden layers in the MLP.
-hidden_dim: Number of neurons in each hidden layer.
-Experiment with these to find the optimal capacity for your specific ODE problem. More complex ODEs might require deeper or wider networks.
-Dependencies
-Python 3.x
-PyTorch (torch)
-NumPy (numpy)
-SciPy (scipy)
-Matplotlib (matplotlib)
-Future Work and Enhancements
-Full Physics-Informed Neural Networks (PINNs): Extend the loss function to include the ODE residual throughout the domain, potentially improving generalization and extrapolation capabilities. (DONE)
-Higher-Order ODEs: Generalize the ode_system function and solution handling for ODEs of arbitrary order.
-Parameter Inference: Implement capabilities to infer ODE parameters from noisy data.
-More Complex Boundary Conditions: Support for boundary value problems (BVPs) and more complex initial/boundary conditions.
-Hyperparameter Optimization: Integrate tools for automated hyperparameter tuning (e.g., Optuna, Weights & Biases).
-User Interface: Develop a more user-friendly graphical interface.
+* Full Physics-Informed Neural Networks (PINNs): Extend the loss function to include the ODE residual throughout the domain, potentially improving generalization and extrapolation capabilities. (DONE)
+* Higher-Order ODEs: Generalize the ode_system function and solution handling for ODEs of arbitrary order.
+* Parameter Inference: Implement capabilities to infer ODE parameters from noisy data.
+* More Complex Boundary Conditions: Support for boundary value problems (BVPs) and more complex initial/boundary conditions.
+* Hyperparameter Optimization: Integrate tools for automated hyperparameter tuning (e.g., Optuna, Weights & Biases).
+* User Interface: Develop a more user-friendly graphical interface.

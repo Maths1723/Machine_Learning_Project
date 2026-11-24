@@ -62,9 +62,12 @@ cd Fruits && python FRUTTA_main.py
 The PINN part of Exercise 1 was revisited in spring 2026: several bugs in the
 original PINN were fixed (residual only enforced on [0, 1], ignored loss
 weights, wrong SciPy reference for t < c), and a new PINN with exact initial
-conditions and built-in time-translation symmetry was benchmarked. It solves
-all three oscillator families reliably, including Van der Pol where the
-original approach got stuck on the trivial solution. See
+conditions and built-in time-translation symmetry was benchmarked. It solves the three shifted-IC oscillator families
+on every seed tested (3-5), including Van der Pol, where the original approach got
+stuck on the trivial solution. Those families are degenerate, though: one ODE solve
+plus a shift beats every learned model. Where the parameter enters the ODE, the
+PINN is at best 2-3x more accurate than the data-driven surrogate, at about 20x the
+compute, and stiff Van der Pol is still unsolved. See
 `PINN_and_ODEs/PINN/README.md` and `PINN_and_ODEs/PINN/notes/research_log.md`.
 
 ## Authors
@@ -74,4 +77,4 @@ original approach got stuck on the trivial solution. See
 
 ## License
 
-This project is licensed under the [MIT License](https://opensource.org/licenses/MIT).
+This project is licensed under the [MIT License](LICENSE).
