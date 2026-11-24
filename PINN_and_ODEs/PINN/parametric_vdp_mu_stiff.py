@@ -1,4 +1,3 @@
-import numpy as np
 
 # Stiffer Van der Pol family: relaxation oscillations develop as mu grows.
 #     y'' = mu (1 - y^2) y' - y,   y(0) = 1, y'(0) = 0,   mu in [2, 5],  t in [0, 20]

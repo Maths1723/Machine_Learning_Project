@@ -1,12 +1,9 @@
 # - - - Libs - - -
 import os
 os.environ["OMP_NUM_THREADS"] = "1"
-import numpy as np
-import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 from torch import optim
-from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision.transforms import ToTensor

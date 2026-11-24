@@ -24,43 +24,38 @@ Our results highlight the varying degrees of accuracy achieved by both architect
 
 **Key Competencies:** Machine Learning, Deep Learning, Image Classification, Multilayer Perceptrons (MLP), Convolutional Neural Networks (CNN), Hyperparameter Tuning, Dataset Analysis, Python Programming.
 
-## Files in this Subdirectory
+## Files in this Repository
 
-* `Laboratorio_Analisi_Numerica_Esercizio_7_9.pdf`: The complete technical report in PDF format.
-* `Laboratorio_Analisi_Numerica_Esercizio_7_9.tex`: The LaTeX source code for this report.
-* `img/`: Directory containing all figures and images used in the report.
-* `src/ode_nn/`: Python scripts for Neural Networks in Differential Problems (e.g., `main_ode.py`, model definitions).
-* `src/image_classification/`: Python scripts for Multiclass Image Classification (e.g., `mlp_classifier.py`, `cnn_classifier.py`).
-* `data/`: (If applicable) Directory for any datasets used (e.g., a subset of Fruits-360 if not downloaded on-the-fly).
-* `sample.bib`: The BibTeX file containing references cited in the report.
+* `Fusar_Galimberti_Prog_Lan.pdf`: The complete technical report.
+* `PINN_and_ODEs/ODEs/`: Hybrid (data-driven) neural networks for ODEs (`simple_ode.py` plus one config file per problem).
+* `PINN_and_ODEs/PINN/`: PINNs, the 2026 follow-up library, benchmarks, results and notes.
+* `Fruits/`: Multiclass image classification (MLP and CNN).
 
 ## How to Run
 
-### For Neural Networks in Differential Problems (Python):
-1.  Ensure you have Python installed (preferably Python 3.x).
-2.  Navigate to `src/ode_nn/` within this sub-repository.
-3.  Install necessary Python dependencies (e.g., `numpy`, `scipy`, `tensorflow` or `pytorch` - depending on which framework you used for NNs). It's recommended to include a `requirements.txt` file.
-    ```bash
-    pip install -r requirements.txt
-    ```
-4.  Run the main Python script (e.g., `python main_ode.py`) from your terminal.
+### Neural networks for ODEs
 
-### For Multiclass Image Classification (Python):
-1.  Ensure you have Python installed.
-2.  Navigate to `src/image_classification/` within this sub-repository.
-3.  Install necessary Python dependencies (e.g., `torch` or `tensorflow`, `torchvision` or `keras`, `matplotlib`, `scikit-learn`). A `requirements.txt` file is highly recommended.
-    ```bash
-    pip install -r requirements.txt
-    ```
-4.  Ensure the Fruits-360 dataset is accessible (it might be downloaded automatically by your script, or you may need to place it in the `data/` directory).
-5.  Run the respective Python scripts (e.g., `python mlp_classifier.py` or `python cnn_classifier.py`) from your terminal.
+```bash
+pip install -r PINN_and_ODEs/PINN/requirements.txt
+cd PINN_and_ODEs/PINN && python main.py        # PINN (interactive)
+cd PINN_and_ODEs/ODEs && python simple_ode.py  # hybrid models (interactive)
+```
+
+Run each `cd` line from the repository root.
+
+### Image classification
+
+Requires `torch`, `torchvision`, `numpy` and `matplotlib`, and a local copy of the
+Fruits-360 dataset; set the dataset paths in `Fruits/FRUTTA_main.py`, then:
+
+```bash
+cd Fruits && python FRUTTA_main.py
+```
 
 ## Technologies Utilized
 
-* **Python:** For Neural Network implementations and data processing (TensorFlow/Keras or PyTorch).
-* **MATLAB:** (If any legacy or comparative code from other projects was leveraged, otherwise can be omitted if not directly used here).
-* **SciPy:** For numerical solvers used in data generation for ODEs.
-* **C/C++:** (Majorly for testing purposes within the broader course context, though not directly applied in these specific Python scripts).
+* **Python** with PyTorch and Matplotlib.
+* **SciPy**: numerical solvers for data generation and reference solutions.
 
 ## 2026 follow-up: PINNs
 
@@ -70,12 +65,12 @@ weights, wrong SciPy reference for t < c), and a new PINN with exact initial
 conditions and built-in time-translation symmetry was benchmarked. It solves
 all three oscillator families reliably, including Van der Pol where the
 original approach got stuck on the trivial solution. See
-`PINN_and_ODEs/PINN/README.md.txt` and `PINN_and_ODEs/PINN/notes/research_log.md`.
+`PINN_and_ODEs/PINN/README.md` and `PINN_and_ODEs/PINN/notes/research_log.md`.
 
 ## Authors
 
-* **Leonardo Fusar Bassini** - [Link to Leonardo's LinkedIn profile]
-* **Chiara Galimberti** - [Link to Chiara's profile, if available]
+* **Leonardo Fusar Bassini**
+* **Chiara Galimberti**
 
 ## License
 

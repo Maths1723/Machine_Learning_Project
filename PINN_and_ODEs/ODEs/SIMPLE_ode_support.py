@@ -1,9 +1,8 @@
 # SIMPLE_ode_support.py (CORRECTED FINAL VERSION)
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 import numpy as np
-import matplotlib.pyplot as plt
 import scipy.io # To load .mat files
 from scipy.integrate import solve_ivp # For numerical solving in Python
 

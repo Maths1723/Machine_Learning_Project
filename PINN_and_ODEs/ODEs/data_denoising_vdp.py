@@ -1,4 +1,3 @@
-import numpy as np
 
 # Specific fixed coefficient for the Van der Pol equation
 FIXED_MU_VALUE = 1.0

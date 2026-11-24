@@ -43,8 +43,6 @@ python experiments/summarize.py results/benchmark.csv --plot results/error_vs_pa
 
 ---
 
-Markdown
-
 # Neural Network Based Ordinary Differential Equation Solver
 
 ## Project Overview
@@ -93,10 +91,12 @@ This hybrid loss steers the neural network to not only learn the solution curves
 
 ## Project Structure
 
+```
 .
-├── main_ode_trainer.py         # Main script for data generation, training, and evaluation.
+├── main.py                     # Main script for data generation, training, and evaluation.
 ├── SIMPLE_ode_support.py       # Core utilities: NN model, CustomLoss, Dataset, ODE solver wrapper.
-├── ode_func_files
+└── *.py                        # ODE configs (one per problem).
+```
 
 
 ## Setup and Installation
@@ -130,14 +130,16 @@ This hybrid loss steers the neural network to not only learn the solution curves
 
 ## How to Use the Project
 
-The `main_ode_trainer.py` script orchestrates the entire workflow.
+The `main.py` script orchestrates the entire workflow.
 
 ### 1. Running the Trainer
 
 Execute the main script from your terminal:
 
 ```bash
-python main_ode_trainer.py
+python main.py
+```
+
 You will be prompted for several inputs:
 
 a. ODE Function File Path:
@@ -186,7 +188,7 @@ If your input $c$ is outside this training range, the script will issue a Warnin
 Adding New ODE Function Files
 The project is designed to be extensible. To train a model for a new ODE:
 
-Create a New Python File: Create a new .py file (e.g., ode_func_new.py) in the same directory as main_ode_trainer.py.
+Create a New Python File: Create a new .py file (e.g., ode_func_new.py) in the same directory as main.py.
 
 Define Required Parameters: Inside this file, define all the required problem-specific parameters. Crucially, adhere strictly to the naming conventions:
 
@@ -209,12 +211,12 @@ $y$ is a list/array $[y, y']$.
 param_val is the current value of the parameter defined by PARAM_NAME_IN_MAT_FILE.
 Return a list [dy/dx, d2y/dx2]. For a second-order ODE, dy/dx will always be y[1].
 Handle Singularities: If your ODE involves division by $x$ or other terms that become undefined at certain points, include if checks within ode_system to return np.inf or np.nan (though it's best practice to set X_EVAL_START_GEN and PARAM_MIN_VALUE to avoid these points directly during data generation/evaluation).
-Run main_ode_trainer.py: When prompted, provide the path to your new ODE function file.
+Run main.py: When prompted, provide the path to your new ODE function file.
 
 Customization and Hyperparameters
-You can customize the training process and neural network architecture by modifying main_ode_trainer.py and SIMPLE_ode_support.py:
+You can customize the training process and neural network architecture by modifying main.py and SIMPLE_ode_support.py:
 
-In main_ode_trainer.py:
+In main.py:
 epochs: Number of full passes through the training dataset. More epochs can lead to better learning but also overfitting.
 batch_size: Number of samples processed in each training step. Larger batches might lead to more stable gradients but slower updates.
 optimizer_class: Change to torch.optim.SGD, torch.optim.AdamW, etc.

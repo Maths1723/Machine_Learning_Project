@@ -1,4 +1,3 @@
-import numpy as np
 
 # Problem-Specific Parameters
 PARAM_NAME_IN_MAT_FILE = 'c_values' # 'c' is the varying initial condition point

@@ -1,4 +1,3 @@
-import numpy as np
 
 # Van der Pol with a varying NONLINEARITY parameter (not a varying IC point):
 #     y'' = mu * (1 - y^2) * y' - y,     y(0) = 1, y'(0) = 0,   mu in [0.5, 2]
